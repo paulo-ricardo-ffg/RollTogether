@@ -12,8 +12,6 @@ A virtual tabletop for RPGs and board games featuring immersive 3D dice rolling,
 
 # 🌐 Live Demo
 
-## 🚀 Play Now
-
 https://paulo-ricardo-ffg.github.io/RollTogether/
 
 ---
