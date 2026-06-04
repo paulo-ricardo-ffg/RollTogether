@@ -852,6 +852,8 @@ function hideStatus() {
 const $ = id => document.getElementById(id);
 function showScreen(id) {
   ["screen-name","screen-lobby","screen-room"].forEach(s => $(s).style.display = s === id ? "block" : "none");
+  const hdr = document.querySelector("header");
+  if (hdr) hdr.style.display = id === "screen-room" ? "none" : "";
 }
 function escHtml(s) {
   return String(s||"").replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]||m));
