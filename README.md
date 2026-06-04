@@ -32,7 +32,6 @@ https://paulo-ricardo-ffg.github.io/RollTogether/
 
 | Dice | Description              |
 | ---- | ------------------------ |
-| D2   | Coin Flip                |
 | D4   | Tetrahedron              |
 | D6   | Cube                     |
 | D8   | Octahedron               |
