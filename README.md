@@ -211,12 +211,12 @@ Open a Pull Request and describe your changes.
 
 | Feature              | Status         |
 | -------------------- | -------------- |
-| D2-D20 Dice          | ✅ Complete     |
+| D4-D20 Dice          | ✅ Complete     |
 | D100 Dice            | ✅ Complete     |
 | 3D Physics           | ✅ Complete     |
 | Multiplayer          | ✅ Complete     |
 | Firebase Integration | ✅ Complete     |
-| Roll History         | 🔄 In Progress |
+| Roll History         | ✅ Complete |
 | Statistics Dashboard | 📅 Planned     |
 
 ---
