@@ -848,6 +848,42 @@ function hideStatus() {
   if (el) el.classList.add("gone");
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// FUNÇÃO rollDice3D - lida com múltiplos tipos de dados diferentes
+// ═══════════════════════════════════════════════════════════════════════════════
+async function rollDice3D(segments) {
+  if (!segments || segments.length === 0) return;
+  if (segments.length === 1) {
+    return Box.roll(segments[0]);
+  }
+  await Box.roll(segments[0]);
+  for (let i = 1; i < segments.length; i++) {
+    await Box.add(segments[i]);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FUNÇÃO rollD100 - rola 2 dados d10 fisicamente (dezenas e unidades)
+// ═══════════════════════════════════════════════════════════════════════════════
+function rollD100() {
+  const tensDie = Math.floor(Math.random() * 10);  // 0-9 → 00,10,20...90
+  const unitsDie = Math.floor(Math.random() * 10); // 0-9 → 0-9
+  const total = (tensDie === 0 && unitsDie === 0) ? 100 : tensDie * 10 + unitsDie;
+  
+  // Para animação 3D: d10 visual tem faces 1-10
+  // tens: 0→10("00"), 1→1("10"), 2→2("20")...
+  // units: 0→10("0"), 1→1, 2→2...
+  const tensVisual = tensDie === 0 ? 10 : tensDie;
+  const unitsVisual = unitsDie === 0 ? 10 : unitsDie;
+  
+  return {
+    total: total,
+    breakdown: `d100=(${tensDie === 0 ? '00' : tensDie * 10}+${unitsDie})→${total}`,
+    tensVisual: tensVisual,
+    unitsVisual: unitsVisual
+  };
+}
+
 /* ── HELPERS ── */
 const $ = id => document.getElementById(id);
 function showScreen(id) {
@@ -991,16 +1027,21 @@ function initRollCommands(roomCode) {
   const commandsRef = ref(db, `rooms/${roomCode}/rollCommands`);
   rollCommandsUnsub = onChildAdded(commandsRef, async snap => {
     const cmd = snap.val();
-    // Ignora o próprio comando (rolador já animou localmente)
     if (!cmd || cmd.uid === uid) return;
     if (boxReady && Box) {
       try {
         setStatus(cmd.playerIcon || "☠", `${cmd.player} está rolando dados…`);
         $("dice-box-container").classList.add("rolling");
-        // syncNotation usa notação predeterminística "NdS@v1,v2,..."
-        // → a animação 3D para exatamente nos valores corretos para todos
-        const syncNotation = cmd.syncNotation || cmd.notation;
-        await Box.roll(syncNotation);
+        
+        let segments;
+        if (cmd.syncSegments && Array.isArray(cmd.syncSegments)) {
+          segments = cmd.syncSegments;
+        } else {
+          const notation = cmd.syncNotation || cmd.notation;
+          segments = [notation];
+        }
+        
+        await rollDice3D(segments);
         hideStatus();
         setTimeout(() => $("dice-box-container").classList.remove("rolling"), 800);
         await remove(ref(db, `rooms/${roomCode}/rollCommands/${snap.key}`));
@@ -1058,25 +1099,10 @@ function resetName() {
   showScreen("screen-name");
 }
 
-/* ── ROLL ── */
-// ── Rolagem com sincronização visual perfeita ────────────────────────────────
-// dice-box-threejs suporta notação predeterminística: "NdS@v1,v2,..."
-// Isso faz a animação 3D parar EXATAMENTE nos valores sorteados,
-// igual para todos os jogadores da sala.
-
-// Gera valores aleatórios para cada dado selecionado
-function generateResults(sel) {
-  return sel.flatMap(d =>
-    Array.from({ length: counts[d.id] }, () => ({
-      dieId: d.id, sides: d.sides,
-      val: Math.floor(Math.random() * d.sides) + 1
-    }))
-  );
-}
-
-// Constrói notação predeterminística: "2d6@3,5+1d20@17"
-// Agrupa por tipo de dado mantendo a ordem de aparição
-function buildSyncNotation(results) {
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROLL CORRIGIDA COM D100 (2 DADOS d10 FÍSICOS)
+// ═══════════════════════════════════════════════════════════════════════════════
+function buildSegmentsArray(results) {
   const groups = [];
   let i = 0;
   while (i < results.length) {
@@ -1088,51 +1114,114 @@ function buildSyncNotation(results) {
     }
     groups.push(`${vals.length}d${sides}@${vals.join(",")}`);
   }
-  return groups.join("+");
+  return groups;
 }
 
 async function roll() {
   if(!room) return;
-  const sel = DICE.filter(d => counts[d.id]>0);
+  const sel = DICE.filter(d => counts[d.id] > 0);
   if(!sel.length){ showToast("Selecione pelo menos um dado!"); return; }
   $("roll-btn").disabled = true;
 
   try {
-    // 1. Gerar resultados aleatórios ANTES de qualquer animação
-    const results = generateResults(sel);
+    // 1. Gerar resultados - D100 gera 2 entradas (d10 para dezenas e unidades)
+    const results = [];
+    
+    for (const d of sel) {
+      const n = counts[d.id];
+      for (let i = 0; i < n; i++) {
+        if (d.id === "d100") {
+          const d100Result = rollD100();
+          // Adiciona dois dados d10 para animação 3D
+          results.push({
+            sides: 10,
+            val: d100Result.tensVisual,
+            isD100Part: true,
+            d100Total: d100Result.total,
+            d100Breakdown: d100Result.breakdown
+          });
+          results.push({
+            sides: 10,
+            val: d100Result.unitsVisual,
+            isD100Part: true,
+            d100Total: d100Result.total,
+            d100Breakdown: d100Result.breakdown
+          });
+        } else {
+          const val = Math.floor(Math.random() * d.sides) + 1;
+          results.push({ dieId: d.id, sides: d.sides, val });
+        }
+      }
+    }
 
-    // 2. Notação predeterminística → dado para exatamente nesses números
-    //    em TODOS os clientes (animação visual perfeita e sincronizada)
-    const syncNotation = buildSyncNotation(results);
+    // 2. Construir array de segmentos para animação 3D
+    const syncSegments = buildSegmentsArray(results);
 
-    // Notação legível para exibir na fórmula (sem @valores)
-    const formulaStr = sel.map(d => `${counts[d.id]}${d.id}`).join("+") +
+    // 3. Notação legível para exibição
+    const formulaParts = [];
+    for (const d of sel) {
+      if (d.id === "d100") {
+        formulaParts.push(`${counts[d.id]}d100`);
+      } else {
+        formulaParts.push(`${counts[d.id]}${d.id}`);
+      }
+    }
+    const formulaStr = formulaParts.join("+") +
       (modifier !== 0 ? (modifier > 0 ? `+${modifier}` : `${modifier}`) : "");
 
-    // 3. Publicar comando com syncNotation → outros clientes animam com os mesmos valores
+    // 4. Publicar comando com syncSegments (ARRAY) para outros clientes
     await push(ref(db, `rooms/${room}/rollCommands`), {
       uid, player, playerIcon: currentPlayerIcon,
-      notation: syncNotation,
-      syncNotation,
+      syncSegments: syncSegments,
       ts: serverTimestamp()
     });
 
-    // 4. Animar localmente com os valores já determinados
+    // 5. Animar localmente com os segmentos
     setStatus(currentPlayerIcon, "Rolando dados…");
     $("dice-box-container").classList.add("rolling");
-    await Box.roll(syncNotation);
+    if (boxReady && Box) {
+      await rollDice3D(syncSegments);
+    }
 
-    // 5. Calcular resultado final
-    const total3d = results.reduce((s, r) => s + r.val, 0);
-    const total   = total3d + modifier;
-    const breakdown = results.map(r => `${r.dieId}=${r.val}`).join(", ") +
+    // 6. Calcular total - agrupa pares de d100
+    let totalDice = 0;
+    const breakdownParts = [];
+    let i = 0;
+    while (i < results.length) {
+      if (results[i].isD100Part) {
+        totalDice += results[i].d100Total;
+        breakdownParts.push(results[i].d100Breakdown);
+        i += 2;
+      } else {
+        totalDice += results[i].val;
+        breakdownParts.push(`${results[i].dieId}=${results[i].val}`);
+        i++;
+      }
+    }
+    
+    const total = totalDice + modifier;
+    const breakdown = breakdownParts.join(", ") +
       (modifier !== 0 ? `, mod=${modifier > 0 ? "+" : ""}${modifier}` : "");
 
-    const isSingle  = results.length === 1;
-    const isCrit    = isSingle && results[0].val === results[0].sides;
-    const isFumble  = isSingle && results[0].val === 1;
+    // 7. Verificar crítico/fumble
+    const isSingleNonD100 = sel.length === 1 && sel[0].id !== "d100";
+    const isSingleD100 = sel.length === 1 && sel[0].id === "d100" && counts["d100"] === 1;
+    
+    let isCrit = false;
+    let isFumble = false;
+    
+    if (isSingleNonD100) {
+      const firstResult = results.find(r => !r.isD100Part);
+      if (firstResult) {
+        isCrit = firstResult.val === firstResult.sides;
+        isFumble = firstResult.val === 1;
+      }
+    } else if (isSingleD100) {
+      isCrit = total === 100;
+      isFumble = total === 1;
+    }
 
-    // 6. Salvar resultado correto no Firebase
+    // 8. Salvar resultado no Firebase
     const newRef = await push(ref(db, `rooms/${room}/rolls`), {
       player, playerIcon: currentPlayerIcon,
       formula: formulaStr, breakdown, total, isCrit, isFumble, uid,
@@ -1143,6 +1232,7 @@ async function roll() {
 
   } catch(err) {
     console.error(err);
+    showToast("Erro ao rolar dados!", "error");
   } finally {
     $("roll-btn").disabled = false;
     setTimeout(() => $("dice-box-container").classList.remove("rolling"), 800);
