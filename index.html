@@ -544,7 +544,29 @@ function computeStats(rolls) { $("stat-total").textContent=rolls.length; $("stat
 function renderFeed() { let items = [...allRolls]; if (activeFilter === "mine") items = items.filter(r => r.uid === uid); if (activeFilter === "crits") items = items.filter(r => r.isCrit); const feed = $("feed-list"); if (!items.length) { feed.innerHTML = '<div class="feed-empty">📜 Nenhum feito ainda.</div>'; return; } feed.innerHTML = items.slice().reverse().map(r => `<div class="feed-item ${r.isCrit?'is-crit':''} ${r.uid===uid?'is-mine':''}"><div style="display:flex;justify-content:space-between"><span>${r.playerIcon || '🎭'} ${esc(r.player)} ${r.isCrit?'<span class="badge-rpg">CRÍTICO</span>':''} ${r.isFumb?'<span class="badge-rpg">FUMBLE</span>':''} ${r.uid===uid?'<span class="badge-rpg">VOCÊ</span>':''}</span><span style="opacity:0.4;font-size:11px">${ago(r.ts)}</span></div><div style="margin-top:4px">${esc(r.formula)} = <strong style="color:var(--gold)">${r.total}</strong></div><div style="font-size:11px;opacity:0.5;margin-top:2px">${esc(r.breakdown)}</div></div>`).join(''); }
 function initFeed(roomCode) { if(feedUnsub) feedUnsub(); const rollsRef = ref(db, "rooms/" + roomCode + "/rolls"); let seenKeys = new Set(); let ready = false; const unsubVal = onValue(rollsRef, snap => { seenKeys = new Set(); allRolls = []; if(snap.exists()) snap.forEach(c => { seenKeys.add(c.key); allRolls.push({ ...c.val(), _key: c.key }); }); computeStats(allRolls); renderFeed(); ready = true; }); const unsubChild = onChildAdded(rollsRef, snap => { if(!ready||seenKeys.has(snap.key)) return; seenKeys.add(snap.key); const newRoll = { ...snap.val(), _key: snap.key }; allRolls.push(newRoll); computeStats(allRolls); renderFeed(); if(lastRollId !== snap.key) { lastRollId = snap.key; setTimeout(()=>showResult(newRoll.total, newRoll.isCrit?"✦ CRÍTICO! ✦":newRoll.isFumb?"☠ FUMBLE ☠":newRoll.formula), 100); } }); feedUnsub = () => { unsubVal(); unsubChild(); }; }
 function initOnline(roomCode) { if(onlineUnsub) onlineUnsub(); onlineUnsub = onValue(ref(db, `rooms/${roomCode}/online`), snap => { const playersData = snap.val() || {}; $("online-count").textContent = Object.keys(playersData).length; const container = document.getElementById("online-players-list"); if(container) container.innerHTML = Object.entries(playersData).map(([id, data]) => `<div class="player-icon-badge"><span>${data.icon||"🎲"}</span><span>${esc(data.name||"Anônimo")}</span></div>`).join(''); }); }
-function initRollCommands(roomCode) { if(rollCommandsUnsub) rollCommandsUnsub(); const commandsRef = ref(db, `rooms/${roomCode}/rollCommands`); rollCommandsUnsub = onChildAdded(commandsRef, async (snap) => { const cmd = snap.val(); if(!cmd || cmd.uid === uid) return; if(boxReady && Box) { try { const icon = cmd.playerIcon || "🎲"; setStatus(icon, `${cmd.player} está rolando dados...`); await rollDice3D(cmd.notation); hideStatus(); await remove(ref(db, `rooms/${roomCode}/rollCommands/${snap.key}`)); } catch(e) { console.warn(e); } } }); }
+function initRollCommands(roomCode) {
+  if(rollCommandsUnsub) rollCommandsUnsub();
+  const commandsRef = ref(db, `rooms/${roomCode}/rollCommands`);
+  rollCommandsUnsub = onChildAdded(commandsRef, async (snap) => {
+    const cmd = snap.val();
+    // Ignora o próprio comando (rolador já animou localmente)
+    if(!cmd || cmd.uid === uid) return;
+    if(boxReady && Box) {
+      try {
+        const icon = cmd.playerIcon || "🎲";
+        setStatus(icon, `${cmd.player} está rolando dados...`);
+        $("dice-box-container").classList.add("rolling");
+        // syncNotation usa notação predeterminística "NdS@v1,v2,..."
+        // → a animação 3D para exatamente nos valores corretos para todos
+        const syncNotation = cmd.syncNotation || cmd.notation;
+        await rollDice3D(syncNotation);
+        hideStatus();
+        setTimeout(() => $("dice-box-container").classList.remove("rolling"), 800);
+        await remove(ref(db, `rooms/${roomCode}/rollCommands/${snap.key}`));
+      } catch(e) { console.warn(e); hideStatus(); $("dice-box-container").classList.remove("rolling"); }
+    }
+  });
+}
 
 async function enterRoom(code) { if(feedUnsub) feedUnsub(); if(onlineUnsub) onlineUnsub(); if(rollCommandsUnsub) rollCommandsUnsub(); room = code; const chosenIcon = await getAvailableIcon(room, uid); currentPlayerIcon = chosenIcon; const onRef = ref(db, `rooms/${code}/online/${uid}`); await set(onRef, { name: player, ts: serverTimestamp(), icon: chosenIcon }); onDisconnect(onRef).remove(); $("display-name").textContent = player; $("display-room-code").textContent = code; clearAll(); allRolls = []; activeFilter = "all"; screen("screen-room"); initFeed(code); initOnline(code); initRollCommands(code); requestAnimationFrame(() => initDiceBox()); }
 async function createRoom() { const gen=()=>{const L="ABCDEFGHJKLMNPQRSTUVWXYZ",D="23456789";let c=""; for(let i=0;i<3;i++)c+=L[Math.floor(Math.random()*L.length)]; for(let i=0;i<3;i++)c+=D[Math.floor(Math.random()*D.length)]; return c;}; let code=gen(),snap=await get(ref(db,`rooms/${code}`)); while(snap.exists()){code=gen();snap=await get(ref(db,`rooms/${code}`));} await enterRoom(code); }
@@ -569,36 +591,114 @@ document.querySelectorAll("[data-filter]").forEach(btn=> btn.addEventListener("c
 $("mod-plus").onclick =()=>{modifier++;updateModDisplay();updateFormula();};
 $("mod-minus").onclick=()=>{modifier--;updateModDisplay();updateFormula();};
 
+// ─── Rolagem com sincronização visual perfeita ────────────────────────────────
+// dice-box-threejs suporta notação predeterminística: "NdS@v1,v2,..."
+// Isso faz a animação 3D parar EXATAMENTE nos valores sorteados,
+// igual para todos os jogadores na sala.
+
+// Gera valores aleatórios para cada dado selecionado
+function generateResults(sel) {
+  return sel.flatMap(d => {
+    const n = counts[d.id];
+    return Array.from({ length: n }, () => ({
+      dieId: d.id,
+      sides: d.sides,
+      val: Math.floor(Math.random() * d.sides) + 1
+    }));
+  });
+}
+
+// Constrói a notação predeterminística ex: "2d6@3,5+1d20@17"
+// Agrupa os resultados por tipo de dado para montar os segmentos
+function buildSyncNotation(results) {
+  // Agrupa em ordem de aparição mantendo sequência original
+  const groups = [];
+  let i = 0;
+  while (i < results.length) {
+    const sides = results[i].sides;
+    const slice = [];
+    while (i < results.length && results[i].sides === sides) {
+      slice.push(results[i].val);
+      i++;
+    }
+    groups.push(`${slice.length}d${sides}@${slice.join(",")}`);
+  }
+  return groups.join("+");
+}
+
 async function roll() {
   if(!room) return;
-  const sel=DICE.filter(d=>counts[d.id]>0);
-  if(!sel.length){ const el=$("formula-display"); el.style.animation="shake 0.4s ease"; setTimeout(()=>el.style.animation="",500); return; }
-  const rollBtn=$("roll-btn"); rollBtn.disabled=true;
-  const notation = sel.map(d => d.id === "d100" ? counts[d.id] + "d100+" + counts[d.id] + "d10" : counts[d.id] + "d" + d.sides).join("+");
-  await push(ref(db, `rooms/${room}/rollCommands`), { uid, player, playerIcon: currentPlayerIcon, notation, ts: serverTimestamp() });
+  const sel = DICE.filter(d => counts[d.id] > 0);
+  if(!sel.length) {
+    const el = $("formula-display");
+    el.style.animation = "shake 0.4s ease";
+    setTimeout(() => el.style.animation = "", 500);
+    return;
+  }
+  const rollBtn = $("roll-btn");
+  rollBtn.disabled = true;
+
   try {
-    setStatus(currentPlayerIcon, "Rolando dados..."); $("dice-box-container").classList.add("rolling");
-    const raw = await rollDice3D(notation);
-    let results = [], total3d = 0;
-    if(raw && raw.sets && raw.sets.length) {
-      const d100Count = counts["d100"]||0;
-      const d100Sets = raw.sets.filter(s => s.sides === 100);
-      const d10CompSets = d100Count>0 ? raw.sets.filter(s => s.sides === 10).slice(0,d100Count) : [];
-      const otherSets = raw.sets.filter(s => { if(s.sides===100) return false; if(s.sides===10 && d100Count>0 && d10CompSets.includes(s)) return false; return true; });
-      const paired = d100Sets.flatMap((set,idx) => { const compSet = d10CompSets[idx]; return set.rolls.map((roll, rIdx) => { const tens = roll.value??10; const units = compSet ? (compSet.rolls[rIdx]?.value??1) : 0; const u = units===10?0:units; const finalVal = (tens===0&&u===0)?100:(tens+u); return { die: DICE.find(d=>d.id==="d100")??{id:"d100",sides:100}, val: finalVal }; }); });
-      const otherRes = otherSets.flatMap(set => set.rolls.map(roll => ({ die: DICE.find(d=>d.sides===set.sides)??{id:"d"+set.sides,sides:set.sides}, val: roll.value??1 })));
-      results = [...paired, ...otherRes];
-      total3d = results.reduce((s,r)=>s+r.val,0);
-    } else { results = sel.flatMap(d=>Array.from({length:counts[d.id]},()=>({ die:d, val:Math.floor(Math.random()*d.sides)+1 }))); total3d = results.reduce((s,r)=>s+r.val,0); }
-    const total = total3d + modifier;
-    const breakdown = results.map(r=>`${r.die.id}=${r.val}`).join(", ") + (modifier!==0?`, mod=${modifier>0?"+":""}${modifier}`:"");
-    const isSingle = results.length===1; const isCrit = isSingle && results[0].val===results[0].die.sides; const isFumb = isSingle && results[0].val===1;
-    const formulaStr = sel.map(d=>`${counts[d.id]}${d.id}`).join("+") + (modifier!==0?(modifier>0?`+${modifier}`:`${modifier}`):"");
-    const newRollRef = await push(ref(db,`rooms/${room}/rolls`),{ player, playerIcon: currentPlayerIcon, formula: formulaStr, breakdown, total, isCrit, isFumb, uid, ts: serverTimestamp() });
+    // 1. Gerar resultados aleatórios ANTES de qualquer animação
+    const results = generateResults(sel);
+
+    // 2. Construir notação predeterminística para sincronizar animação visual
+    //    Ex: "2d6@3,5+1d20@17" → dado para exatamente nesses números em todos os clientes
+    const syncNotation = buildSyncNotation(results);
+
+    // Notação normal (sem @) para exibição na fórmula
+    const formulaStr = sel.map(d => `${counts[d.id]}${d.id}`).join("+") +
+      (modifier !== 0 ? (modifier > 0 ? `+${modifier}` : `${modifier}`) : "");
+
+    // 3. Publicar comando com syncNotation → outros clientes animam com os mesmos valores
+    await push(ref(db, `rooms/${room}/rollCommands`), {
+      uid, player, playerIcon: currentPlayerIcon,
+      notation: syncNotation,   // para o rolador (unused, mas salvo)
+      syncNotation,             // notação predeterminística para os outros
+      ts: serverTimestamp()
+    });
+
+    // 4. Animar localmente com os valores já determinados
+    setStatus(currentPlayerIcon, "Rolando dados...");
+    $("dice-box-container").classList.add("rolling");
+    await rollDice3D(syncNotation);
+
+    // 5. Calcular resultado final
+    const d100Count = counts["d100"] || 0;
+    let finalResults = results;
+    // Tratamento especial para d100 (tens + units combinados)
+    if(d100Count > 0) {
+      const d100Rolls = results.filter(r => r.dieId === "d100");
+      const others    = results.filter(r => r.dieId !== "d100");
+      finalResults = [...d100Rolls, ...others];
+    }
+
+    const total3d = finalResults.reduce((s, r) => s + r.val, 0);
+    const total   = total3d + modifier;
+    const breakdown = finalResults.map(r => `${r.dieId}=${r.val}`).join(", ") +
+      (modifier !== 0 ? `, mod=${modifier > 0 ? "+" : ""}${modifier}` : "");
+
+    const isSingle = finalResults.length === 1;
+    const isCrit   = isSingle && finalResults[0].val === finalResults[0].sides;
+    const isFumb   = isSingle && finalResults[0].val === 1;
+
+    // 6. Salvar resultado correto no Firebase
+    const newRollRef = await push(ref(db, `rooms/${room}/rolls`), {
+      player, playerIcon: currentPlayerIcon,
+      formula: formulaStr, breakdown, total, isCrit, isFumb, uid,
+      ts: serverTimestamp()
+    });
     lastRollId = newRollRef.key;
-    showResult(total, isCrit?"✦ CRÍTICO! ✦":isFumb?"☠ FUMBLE ☠":formulaStr);
+    showResult(total, isCrit ? "✦ CRÍTICO! ✦" : isFumb ? "☠ FUMBLE ☠" : formulaStr);
     _hasRolled = true;
-  } catch(err) { console.error(err); } finally { rollBtn.disabled=false; setTimeout(()=>$("dice-box-container").classList.remove("rolling"),800); hideStatus(); }
+
+  } catch(err) {
+    console.error(err);
+  } finally {
+    rollBtn.disabled = false;
+    setTimeout(() => $("dice-box-container").classList.remove("rolling"), 800);
+    hideStatus();
+  }
 }
 $("roll-btn").onclick = roll;
 renderDice(); updateFormula(); updateModDisplay();
