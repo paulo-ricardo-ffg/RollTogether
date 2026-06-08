@@ -440,6 +440,52 @@ let Box = null;
 let boxReady = false;
 let _hasRolled = false;
 
+async function destroyDiceBox() {
+  if (!Box) return;
+
+  try {
+    Box.clear?.();
+    Box.destroy?.();
+  } catch (e) {
+    console.warn("Erro destruindo DiceBox:", e);
+  }
+
+  Box = null;
+  boxReady = false;
+  _hasRolled = false;
+
+  const container = document.getElementById("dice-box-container");
+
+  if (container) {
+    container.querySelectorAll("canvas").forEach(c => c.remove());
+    container.classList.remove("rolling");
+  }
+}
+
+async function cleanupRoom(roomCode) {
+
+  if (!roomCode) return;
+
+  try {
+
+    const onlineRef = ref(db, `rooms/${roomCode}/online`);
+
+    const snap = await get(onlineRef);
+
+    if (!snap.exists()) {
+
+      console.log("Sala removida:", roomCode);
+
+      await remove(ref(db, `rooms/${roomCode}`));
+    }
+
+  } catch (err) {
+
+    console.warn("Erro limpando sala:", err);
+
+  }
+}
+
 const DICE_THEMES = [
   { id:"black",       name:"Obsidiana",      colorset:"black",       surface:"stainless", preview:"#111" },
   { id:"white",       name:"Marfim",         colorset:"white",       surface:"default",   preview:"#f0f0e8" },
@@ -687,18 +733,45 @@ function initRollCommands(roomCode) {
 }
 
 async function enterRoom(code) {
-  if (feedUnsub) feedUnsub(); if (onlineUnsub) onlineUnsub(); if (rollCommandsUnsub) rollCommandsUnsub();
+  await cleanAllEmptyRooms();
+  if (feedUnsub) feedUnsub();
+  if (onlineUnsub) onlineUnsub();
+  if (rollCommandsUnsub) rollCommandsUnsub();
+
+  await destroyDiceBox();
+
   room = code;
+
   const chosenIcon = await getAvailableIcon(room, uid);
+
   currentPlayerIcon = chosenIcon;
+
   const onRef = ref(db, `rooms/${code}/online/${uid}`);
-  await set(onRef, { name: player, ts: serverTimestamp(), icon: chosenIcon });
+
+  await set(onRef, {
+    name: player,
+    ts: serverTimestamp(),
+    icon: chosenIcon
+  });
+
   onDisconnect(onRef).remove();
-  $("display-name").textContent = player; $("display-room-code").textContent = code;
-  clearAll(); allRolls = []; activeFilter = "all";
+
+  $("display-name").textContent = player;
+  $("display-room-code").textContent = code;
+
+  clearAll();
+  allRolls = [];
+  activeFilter = "all";
+
   screen("screen-room");
-  initFeed(code); initOnline(code); initRollCommands(code);
-  requestAnimationFrame(() => initDiceBox());
+
+  initFeed(code);
+  initOnline(code);
+  initRollCommands(code);
+
+  requestAnimationFrame(async () => {
+    await initDiceBox();
+  });
 }
 async function createRoom() {
   const gen = () => { const L="ABCDEFGHJKLMNPQRSTUVWXYZ",D="23456789"; let c=""; for(let i=0;i<3;i++) c+=L[Math.floor(Math.random()*L.length)]; for(let i=0;i<3;i++) c+=D[Math.floor(Math.random()*D.length)]; return c; };
@@ -711,16 +784,79 @@ async function joinRoom() {
   if (code.length !== 6) return;
   await enterRoom(code);
 }
-function leaveRoom() {
-  if (room) remove(ref(db, `rooms/${room}/online/${uid}`));
-  if (feedUnsub) feedUnsub(); if (onlineUnsub) onlineUnsub(); if (rollCommandsUnsub) rollCommandsUnsub();
-  if (Box && boxReady) { try { Box.clear?.(); } catch(e) {} }
-  room = ""; $("join-form").style.display = "none"; $("input-room-code").value = ""; screen("screen-lobby");
+async function leaveRoom() {
+
+  const oldRoom = room;
+
+  if (room) {
+
+    await remove(
+      ref(db, `rooms/${room}/online/${uid}`)
+    );
+
+  }
+
+  if (feedUnsub) feedUnsub();
+  if (onlineUnsub) onlineUnsub();
+  if (rollCommandsUnsub) rollCommandsUnsub();
+
+  await destroyDiceBox();
+
+  await cleanupRoom(oldRoom);
+
+  room = "";
+
+  screen("screen-lobby");
 }
-function resetName() {
-  if (room) remove(ref(db, `rooms/${room}/online/${uid}`));
-  if (feedUnsub) feedUnsub(); if (onlineUnsub) onlineUnsub(); if (rollCommandsUnsub) rollCommandsUnsub();
-  room = ""; $("input-name").value = ""; $("input-room-code").value = ""; screen("screen-name");
+
+async function cleanAllEmptyRooms() {
+  console.log("🧹 Executando limpeza de salas vazias...");
+  try {
+    const snap = await get(ref(db, "rooms"));
+    if (!snap.exists()) return;
+    const rooms = snap.val();
+    for (const roomId in rooms) {
+      const online = rooms[roomId].online || {};
+      if (Object.keys(online).length === 0) {
+        console.log("🗑️ Removendo sala vazia:", roomId);
+        await remove(ref(db, `rooms/${roomId}`));
+      }
+    }
+  } catch (err) {
+    console.warn("Erro limpando salas:", err);
+  }
+}
+
+// EXPOR FUNÇÃO PARA TESTE NO CONSOLE (apenas depuração)
+window.cleanAllEmptyRooms = cleanAllEmptyRooms;
+console.log("✅ cleanAllEmptyRooms carregada com sucesso");
+
+async function resetName() {
+
+  const oldRoom = room;
+
+  if (room) {
+
+    await remove(
+      ref(db, `rooms/${room}/online/${uid}`)
+    );
+
+  }
+
+  if (feedUnsub) feedUnsub();
+  if (onlineUnsub) onlineUnsub();
+  if (rollCommandsUnsub) rollCommandsUnsub();
+
+  await destroyDiceBox();
+
+  await cleanupRoom(oldRoom);
+
+  room = "";
+
+  $("input-name").value = "";
+  $("input-room-code").value = "";
+
+  screen("screen-name");
 }
 
 $("btn-name-next").onclick   = () => { const n = $("input-name").value.trim(); if (!n) return; player = n; $("lobby-greeting").innerHTML = `Olá, ${esc(n)}! A Taverna te aguarda.`; screen("screen-lobby"); };
@@ -731,8 +867,14 @@ $("btn-join-show").onclick    = () => { $("join-form").style.display = "block"; 
 $("btn-join-cancel").onclick  = () => { $("join-form").style.display = "none"; };
 $("btn-join-room").onclick    = () => joinRoom();
 $("input-room-code").addEventListener("keypress", e => { if (e.key === "Enter") $("btn-join-room").click(); });
-$("btn-leave-room").onclick   = e => { e.preventDefault(); leaveRoom(); };
-$("btn-change-name").onclick  = e => { e.preventDefault(); resetName(); };
+$("btn-leave-room").onclick = async e => {
+  e.preventDefault();
+  await leaveRoom();
+};
+$("btn-change-name").onclick = async e => {
+  e.preventDefault();
+  await resetName();
+};
 $("copy-code-btn").onclick    = () => { if (!room) return; navigator.clipboard.writeText(room).then(() => { const h = $("copy-hint"); h.textContent = "✅"; setTimeout(() => h.textContent = "📋", 1500); }); };
 $("clear-btn").onclick        = clearAll;
 $("btn-clear-history").onclick = async () => { if (room && confirm("Apagar todos os feitos desta sala?")) await remove(ref(db, `rooms/${room}/rolls`)); };
@@ -904,6 +1046,15 @@ async function roll() {
 $("roll-btn").onclick = roll;
 renderDice(); updateFormula(); updateModDisplay();
 screen("screen-name");
+
+// Executa limpeza inicial de salas vazias
+cleanAllEmptyRooms();
+
+// Agenda limpeza periódica a cada 10 minutos
+setInterval(() => {
+  cleanAllEmptyRooms();
+}, 10 * 60 * 1000);
+
 </script>
 </body>
 </html>
