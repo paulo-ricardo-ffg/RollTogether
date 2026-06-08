@@ -126,7 +126,6 @@ h1{font-family:var(--f-display);font-size:clamp(28px,7vw,64px);font-weight:900;l
   padding:5px 14px 5px 8px;display:inline-flex;align-items:center;gap:8px;
   font-family:var(--f-title);font-size:11px;letter-spacing:1px;transition:border-color 0.2s}
 .player-icon-badge:hover{border-color:rgba(232,201,106,0.35)}
-.player-icon-badge span:first-child{font-size:18px}
 #dice-box-container{width:100%;height:300px;margin:0 0 20px;border-radius:var(--r-card);
   border:1px solid var(--border);box-shadow:var(--shadow-deep),inset 0 0 60px rgba(0,0,0,0.6);
   background:radial-gradient(ellipse at 50% 100%,rgba(28,18,42,1) 0%,rgba(6,4,14,1) 70%);
@@ -162,7 +161,7 @@ h1{font-family:var(--f-display);font-size:clamp(28px,7vw,64px);font-weight:900;l
 .die-minus{position:absolute;bottom:-8px;right:-8px;background:rgba(20,12,30,0.9);border-radius:50%;width:20px;height:20px;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;border:1px solid rgba(120,80,50,0.5);transition:0.15s;color:var(--vellum)}
 .die-runa.selected:hover .die-minus{opacity:1}
 .die-minus:hover{background:rgba(140,30,30,0.9);color:#ffc0c0;border-color:#c04040}
-.die-runa[data-id="d100"] .die-label::after{content:" (d10)";font-size:7px;opacity:0.5}
+.die-runa[data-id="d100"] .die-label::after{content:" (d10+d10)";font-size:7px;opacity:0.5}
 .modificador-forja{display:flex;align-items:center;justify-content:center;gap:20px;background:rgba(0,0,0,0.35);border:1px solid rgba(232,201,106,0.1);border-radius:var(--r-pill);padding:10px 28px;width:fit-content;margin:0 auto 16px}
 .mod-titulo{font-family:var(--f-title);font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--gold-dusk)}
 .mod-botao{background:rgba(22,14,38,0.8);border:1px solid var(--gold-dusk);width:36px;height:36px;border-radius:50%;font-size:20px;font-weight:bold;color:var(--gold);cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;line-height:1}
@@ -417,6 +416,9 @@ let feedUnsub = null, onlineUnsub = null, rollCommandsUnsub = null;
 let allRolls = [], activeFilter = "all", modifier = 0;
 let lastRollId = null;
 
+// ─── Definição dos Dados ────────────────────────────────────────────────────
+// d100 real: rola 2× d10 → dezenas (00,10,20...90) + unidades (0-9) → soma = 1-100
+// Fisicamente são 2 dados d10 na mesa; o resultado é (tens*10 + units), com 00+0 = 100
 const DICE = [
   { id:"d4",   sides:4,   label:"D4"  },
   { id:"d6",   sides:6,   label:"D6"  },
@@ -429,9 +431,9 @@ const DICE = [
 let counts = Object.fromEntries(DICE.map(d => [d.id, 0]));
 
 const RPG_ICONS = [
-  "🧙", "🧝", "🧌", "🧚", "🧛", "🧞", "🐉", "🗡️", "🛡️", "🏹", "🔮", "⚔️",
-  "🪄", "🐺", "🦇", "👹", "👺", "💀", "🕯️", "📜", "🏺", "⛓️", "🔥", "❄️",
-  "🌿", "🍻", "🎭", "🏰", "⚜️", "🐲"
+  "🧙","🧝","🧌","🧚","🧛","🧞","🐉","🗡️","🛡️","🏹","🔮","⚔️",
+  "🪄","🐺","🦇","👹","👺","💀","🕯️","📜","🏺","⛓️","🔥","❄️",
+  "🌿","🍻","🎭","🏰","⚜️","🐲"
 ];
 
 let Box = null;
@@ -439,22 +441,22 @@ let boxReady = false;
 let _hasRolled = false;
 
 const DICE_THEMES = [
-  { id:"black",       name:"Obsidiana",    colorset:"black",       surface:"stainless", preview:"#111" },
-  { id:"white",       name:"Marfim",       colorset:"white",       surface:"default",   preview:"#f0f0e8" },
-  { id:"fire",        name:"Fogo",         colorset:"fire",        surface:"default",   preview:"linear-gradient(135deg,#e03030,#f8a020)" },
-  { id:"ice",         name:"Gelo",         colorset:"ice",         surface:"default",   preview:"linear-gradient(135deg,#a8d5e2,#5090c0)" },
-  { id:"necrotic",    name:"Necrótico",    colorset:"necrotic",    surface:"stainless", preview:"linear-gradient(135deg,#1a0a2a,#6a3080)" },
-  { id:"bloodmoon",   name:"Lua de Sangue",colorset:"bloodmoon",   surface:"default",   preview:"linear-gradient(135deg,#7a1212,#c03030)" },
-  { id:"starynight",  name:"Noite Estrelada",colorset:"starynight",surface:"default",  preview:"linear-gradient(135deg,#0a0a2a,#2030a0)" },
-  { id:"bronze",      name:"Bronze",       colorset:"bronze",      surface:"stainless", preview:"linear-gradient(135deg,#8b5010,#c8941a)" },
-  { id:"dragons",     name:"Dragões",      colorset:"dragons",     surface:"default",   preview:"linear-gradient(135deg,#1a3a10,#40a020)" },
-  { id:"astralsea",   name:"Mar Astral",   colorset:"astralsea",   surface:"default",   preview:"linear-gradient(135deg,#0a1a3a,#4080c0)" },
-  { id:"glitterparty",name:"Glitter",      colorset:"glitterparty",surface:"default",   preview:"linear-gradient(135deg,#c020c0,#ff80ff)" },
-  { id:"water",       name:"Água",         colorset:"water",       surface:"default",   preview:"linear-gradient(135deg,#0a3060,#20a0d0)" },
-  { id:"earth",       name:"Terra",        colorset:"earth",       surface:"default",   preview:"linear-gradient(135deg,#3a2010,#806030)" },
-  { id:"force",       name:"Força",        colorset:"force",       surface:"default",   preview:"linear-gradient(135deg,#101030,#3030a0)" },
-  { id:"psychic",     name:"Psíquico",     colorset:"psychic",     surface:"default",   preview:"linear-gradient(135deg,#400060,#c040ff)" },
-  { id:"tigerking",   name:"Tigre",        colorset:"tigerking",   surface:"default",   preview:"linear-gradient(135deg,#c06010,#f0a830)" },
+  { id:"black",       name:"Obsidiana",      colorset:"black",       surface:"stainless", preview:"#111" },
+  { id:"white",       name:"Marfim",         colorset:"white",       surface:"default",   preview:"#f0f0e8" },
+  { id:"fire",        name:"Fogo",           colorset:"fire",        surface:"default",   preview:"linear-gradient(135deg,#e03030,#f8a020)" },
+  { id:"ice",         name:"Gelo",           colorset:"ice",         surface:"default",   preview:"linear-gradient(135deg,#a8d5e2,#5090c0)" },
+  { id:"necrotic",    name:"Necrótico",      colorset:"necrotic",    surface:"stainless", preview:"linear-gradient(135deg,#1a0a2a,#6a3080)" },
+  { id:"bloodmoon",   name:"Lua de Sangue",  colorset:"bloodmoon",   surface:"default",   preview:"linear-gradient(135deg,#7a1212,#c03030)" },
+  { id:"starynight",  name:"Noite Estrelada",colorset:"starynight",  surface:"default",   preview:"linear-gradient(135deg,#0a0a2a,#2030a0)" },
+  { id:"bronze",      name:"Bronze",         colorset:"bronze",      surface:"stainless", preview:"linear-gradient(135deg,#8b5010,#c8941a)" },
+  { id:"dragons",     name:"Dragões",        colorset:"dragons",     surface:"default",   preview:"linear-gradient(135deg,#1a3a10,#40a020)" },
+  { id:"astralsea",   name:"Mar Astral",     colorset:"astralsea",   surface:"default",   preview:"linear-gradient(135deg,#0a1a3a,#4080c0)" },
+  { id:"glitterparty",name:"Glitter",        colorset:"glitterparty",surface:"default",   preview:"linear-gradient(135deg,#c020c0,#ff80ff)" },
+  { id:"water",       name:"Água",           colorset:"water",       surface:"default",   preview:"linear-gradient(135deg,#0a3060,#20a0d0)" },
+  { id:"earth",       name:"Terra",          colorset:"earth",       surface:"default",   preview:"linear-gradient(135deg,#3a2010,#806030)" },
+  { id:"force",       name:"Força",          colorset:"force",       surface:"default",   preview:"linear-gradient(135deg,#101030,#3030a0)" },
+  { id:"psychic",     name:"Psíquico",       colorset:"psychic",     surface:"default",   preview:"linear-gradient(135deg,#400060,#c040ff)" },
+  { id:"tigerking",   name:"Tigre",          colorset:"tigerking",   surface:"default",   preview:"linear-gradient(135deg,#c06010,#f0a830)" },
 ];
 let currentThemeId = "black";
 
@@ -466,9 +468,8 @@ async function applyTheme(themeId) {
     el.classList.toggle('active', el.dataset.themeId === themeId);
   });
   if (Box && boxReady) {
-    try {
-      await Box.updateConfig({ theme_colorset: theme.colorset, theme_surface: theme.surface });
-    } catch(e) { console.warn('Falha ao atualizar tema:', e); }
+    try { await Box.updateConfig({ theme_colorset: theme.colorset, theme_surface: theme.surface }); }
+    catch(e) { console.warn('Falha ao atualizar tema:', e); }
   }
 }
 function buildThemeGrid() {
@@ -476,7 +477,7 @@ function buildThemeGrid() {
   if (!grid) return;
   grid.innerHTML = DICE_THEMES.map(t => `
     <div class="theme-opt ${t.id === currentThemeId ? 'active' : ''}" data-theme-id="${t.id}">
-      <div class="theme-opt-preview" style="background:${t.preview.startsWith('linear') ? t.preview : 'center/cover ' + t.preview}"></div>
+      <div class="theme-opt-preview" style="background:${t.preview.startsWith('linear') ? t.preview : t.preview}"></div>
       <div class="theme-opt-name">${t.name}</div>
     </div>
   `).join('');
@@ -484,18 +485,12 @@ function buildThemeGrid() {
     el.addEventListener('click', () => applyTheme(el.dataset.themeId));
   });
 }
-const toggleBtn = document.getElementById('theme-toggle-btn');
-const backdropModal = document.getElementById('theme-modal-backdrop');
-const closeModalBtn = document.getElementById('theme-modal-close');
-if (toggleBtn) {
-  toggleBtn.addEventListener('click', e => {
-    e.stopPropagation();
-    buildThemeGrid();
-    backdropModal.classList.add('open');
-  });
-}
-if (closeModalBtn) closeModalBtn.addEventListener('click', () => backdropModal.classList.remove('open'));
-if (backdropModal) backdropModal.addEventListener('click', e => { if (e.target === backdropModal) backdropModal.classList.remove('open'); });
+const toggleBtn       = document.getElementById('theme-toggle-btn');
+const backdropModal   = document.getElementById('theme-modal-backdrop');
+const closeModalBtn   = document.getElementById('theme-modal-close');
+if (toggleBtn)      toggleBtn.addEventListener('click', e => { e.stopPropagation(); buildThemeGrid(); backdropModal.classList.add('open'); });
+if (closeModalBtn)  closeModalBtn.addEventListener('click', () => backdropModal.classList.remove('open'));
+if (backdropModal)  backdropModal.addEventListener('click', e => { if (e.target === backdropModal) backdropModal.classList.remove('open'); });
 
 async function initDiceBox() {
   try {
@@ -508,128 +503,328 @@ async function initDiceBox() {
     });
     await Box.initialize();
     const initTheme = DICE_THEMES.find(t => t.id === currentThemeId);
-    if (initTheme) await Box.updateConfig({ theme_colorset: initTheme.colorset, theme_surface: initTheme.surface }).catch(e=>console.warn);
+    if (initTheme) await Box.updateConfig({ theme_colorset: initTheme.colorset, theme_surface: initTheme.surface }).catch(e=>console.warn(e));
     boxReady = true;
     hideStatus();
   } catch (err) { console.warn("DiceBox falhou", err); boxReady = false; }
 }
-async function rollDice3D(notation) { return Box.roll(notation); }
-function setStatus(icon, txt) { const el = document.getElementById("dice-status"); if(el){ el.innerHTML = `<span class="status-icon">${icon}</span><span class="status-txt">${txt}</span>`; el.classList.remove("gone");} }
+
+// Rola múltiplos grupos de dados no dice-box-threejs.
+// roll() só processa corretamente um grupo por vez quando há tipos mistos.
+// Para múltiplos tipos diferentes: roll() no primeiro, add() nos demais.
+async function rollDice3D(segments) {
+  // segments = array de strings ex: ["2d6@3,5", "1d20@17", "2d10@4,7"]
+  if (!segments || segments.length === 0) return;
+  if (segments.length === 1) {
+    return Box.roll(segments[0]);
+  }
+  // Primeiro grupo com roll() (limpa cena anterior), demais com add()
+  await Box.roll(segments[0]);
+  for (let i = 1; i < segments.length; i++) {
+    await Box.add(segments[i]);
+  }
+}
+
+function setStatus(icon, txt) {
+  const el = document.getElementById("dice-status");
+  if (el) { el.innerHTML = `<span class="status-icon">${icon}</span><span class="status-txt">${txt}</span>`; el.classList.remove("gone"); }
+}
 function hideStatus() { const el = document.getElementById("dice-status"); if (el) el.classList.add("gone"); }
+
 const $ = id => document.getElementById(id);
-function screen(id) { ["screen-name","screen-lobby","screen-room"].forEach(s => $(s).style.display = s === id ? "block" : "none"); if(document.querySelector('.hero')) document.querySelector('.hero').style.display = id === 'screen-room' ? 'none' : 'block'; }
-function esc(s) { return String(s||"").replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+function screen(id) {
+  ["screen-name","screen-lobby","screen-room"].forEach(s => $(s).style.display = s === id ? "block" : "none");
+  if (document.querySelector('.hero')) document.querySelector('.hero').style.display = id === 'screen-room' ? 'none' : 'block';
+}
+function esc(s) { return String(s||"").replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
 function ago(ts) { if (!ts) return ""; const s = Math.round((Date.now()-ts)/1000); if (s<60) return "agora"; if (s<3600) return `${Math.floor(s/60)}min`; return `${Math.floor(s/3600)}h`; }
-function showResult(total, label) { const f=$("result-floater"), l=$("result-label"); if(!f||!l) return; f.textContent=total; l.textContent=label; f.className=""; l.className=""; void f.offsetWidth; f.classList.add("show"); l.classList.add("show"); setTimeout(()=>{ f.classList.replace("show","hide"); l.classList.replace("show","hide"); setTimeout(()=>{f.className="";l.className="";},600); },2200); }
+function showResult(total, label) {
+  const f = $("result-floater"), l = $("result-label");
+  if (!f || !l) return;
+  f.textContent = total; l.textContent = label;
+  f.className = ""; l.className = "";
+  void f.offsetWidth;
+  f.classList.add("show"); l.classList.add("show");
+  setTimeout(() => { f.classList.replace("show","hide"); l.classList.replace("show","hide"); setTimeout(() => { f.className = ""; l.className = ""; }, 600); }, 2200);
+}
 
 function renderDice() {
-  const g=$("dice-grid"); if(!g) return;
-  g.innerHTML = DICE.map(d=>`
+  const g = $("dice-grid"); if (!g) return;
+  g.innerHTML = DICE.map(d => `
     <div class="die-runa ${counts[d.id]>0?"selected":""}" data-id="${d.id}">
       <span class="die-emoji"><img src="./img/${d.id}.png" alt="${d.label}" class="die-img" loading="lazy"></span>
       <span class="die-label">${d.label}</span>
       <span class="die-qty-runa">${counts[d.id]}</span>
       <span class="die-minus" data-minus="${d.id}">−</span>
     </div>`).join("");
-  g.querySelectorAll(".die-runa").forEach(el=> el.addEventListener("click",e=>{ if(e.target.classList.contains("die-minus")) return; counts[el.dataset.id]++; renderDice(); updateFormula(); }));
-  g.querySelectorAll(".die-minus").forEach(el=> el.addEventListener("click",e=>{ e.stopPropagation(); const id=el.dataset.minus; if(counts[id]>0){counts[id]--;renderDice();updateFormula();} }));
+  g.querySelectorAll(".die-runa").forEach(el => el.addEventListener("click", e => {
+    if (e.target.classList.contains("die-minus")) return;
+    counts[el.dataset.id]++; renderDice(); updateFormula();
+  }));
+  g.querySelectorAll(".die-minus").forEach(el => el.addEventListener("click", e => {
+    e.stopPropagation(); const id = el.dataset.minus;
+    if (counts[id] > 0) { counts[id]--; renderDice(); updateFormula(); }
+  }));
 }
-function updateFormula() { const parts=DICE.filter(d=>counts[d.id]>0).map(d=>`${counts[d.id]}${d.id}`); let t=parts.join(" + "); if(modifier!==0) t+=modifier>0?` + ${modifier}`:` − ${Math.abs(modifier)}`; $("formula-display").innerHTML=t||"<em>Selecione os dados</em>"; }
-function clearAll() { DICE.forEach(d=>counts[d.id]=0); modifier=0; updateModDisplay(); renderDice(); updateFormula(); if(Box&&boxReady&&_hasRolled){try{Box.clear?.();}catch(e){}} }
-function updateModDisplay() { const el=$("mod-display"); el.textContent=modifier===0?"+0":(modifier>0?`+${modifier}`:`${modifier}`); el.className="mod-valor"+(modifier>0?" positive":modifier<0?" negative":""); }
 
-async function getAvailableIcon(roomCode, currentUid) { const onlineRef = ref(db, `rooms/${roomCode}/online`); const snapshot = await get(onlineRef); const usedIcons = new Set(); if(snapshot.exists()) Object.entries(snapshot.val()).forEach(([id, info]) => { if(id !== currentUid && info.icon) usedIcons.add(info.icon); }); const available = RPG_ICONS.filter(icon => !usedIcons.has(icon)); return available.length ? available[Math.floor(Math.random() * available.length)] : "🎲"; }
+function updateFormula() {
+  const parts = DICE.filter(d => counts[d.id] > 0).map(d => `${counts[d.id]}${d.id}`);
+  let t = parts.join(" + ");
+  if (modifier !== 0) t += modifier > 0 ? ` + ${modifier}` : ` − ${Math.abs(modifier)}`;
+  $("formula-display").innerHTML = t || "<em>Selecione os dados</em>";
+}
 
-function computeStats(rolls) { $("stat-total").textContent=rolls.length; $("stat-highest").textContent=rolls.length?Math.max(...rolls.map(r=>r.total??0)):0; $("stat-crits").textContent=rolls.filter(r=>r.isCrit).length; }
-function renderFeed() { let items = [...allRolls]; if (activeFilter === "mine") items = items.filter(r => r.uid === uid); if (activeFilter === "crits") items = items.filter(r => r.isCrit); const feed = $("feed-list"); if (!items.length) { feed.innerHTML = '<div class="feed-empty">📜 Nenhum feito ainda.</div>'; return; } feed.innerHTML = items.slice().reverse().map(r => `<div class="feed-item ${r.isCrit?'is-crit':''} ${r.uid===uid?'is-mine':''}"><div style="display:flex;justify-content:space-between"><span>${r.playerIcon || '🎭'} ${esc(r.player)} ${r.isCrit?'<span class="badge-rpg">CRÍTICO</span>':''} ${r.isFumb?'<span class="badge-rpg">FUMBLE</span>':''} ${r.uid===uid?'<span class="badge-rpg">VOCÊ</span>':''}</span><span style="opacity:0.4;font-size:11px">${ago(r.ts)}</span></div><div style="margin-top:4px">${esc(r.formula)} = <strong style="color:var(--gold)">${r.total}</strong></div><div style="font-size:11px;opacity:0.5;margin-top:2px">${esc(r.breakdown)}</div></div>`).join(''); }
-function initFeed(roomCode) { if(feedUnsub) feedUnsub(); const rollsRef = ref(db, "rooms/" + roomCode + "/rolls"); let seenKeys = new Set(); let ready = false; const unsubVal = onValue(rollsRef, snap => { seenKeys = new Set(); allRolls = []; if(snap.exists()) snap.forEach(c => { seenKeys.add(c.key); allRolls.push({ ...c.val(), _key: c.key }); }); computeStats(allRolls); renderFeed(); ready = true; }); const unsubChild = onChildAdded(rollsRef, snap => { if(!ready||seenKeys.has(snap.key)) return; seenKeys.add(snap.key); const newRoll = { ...snap.val(), _key: snap.key }; allRolls.push(newRoll); computeStats(allRolls); renderFeed(); if(lastRollId !== snap.key) { lastRollId = snap.key; setTimeout(()=>showResult(newRoll.total, newRoll.isCrit?"✦ CRÍTICO! ✦":newRoll.isFumb?"☠ FUMBLE ☠":newRoll.formula), 100); } }); feedUnsub = () => { unsubVal(); unsubChild(); }; }
-function initOnline(roomCode) { if(onlineUnsub) onlineUnsub(); onlineUnsub = onValue(ref(db, `rooms/${roomCode}/online`), snap => { const playersData = snap.val() || {}; $("online-count").textContent = Object.keys(playersData).length; const container = document.getElementById("online-players-list"); if(container) container.innerHTML = Object.entries(playersData).map(([id, data]) => `<div class="player-icon-badge"><span>${data.icon||"🎲"}</span><span>${esc(data.name||"Anônimo")}</span></div>`).join(''); }); }
+function clearAll() {
+  DICE.forEach(d => counts[d.id] = 0);
+  modifier = 0; updateModDisplay(); renderDice(); updateFormula();
+  if (Box && boxReady && _hasRolled) { try { Box.clear?.(); } catch(e) {} }
+}
+function updateModDisplay() {
+  const el = $("mod-display");
+  el.textContent = modifier === 0 ? "+0" : (modifier > 0 ? `+${modifier}` : `${modifier}`);
+  el.className = "mod-valor" + (modifier > 0 ? " positive" : modifier < 0 ? " negative" : "");
+}
+
+async function getAvailableIcon(roomCode, currentUid) {
+  const onlineRef = ref(db, `rooms/${roomCode}/online`);
+  const snapshot = await get(onlineRef);
+  const usedIcons = new Set();
+  if (snapshot.exists()) Object.entries(snapshot.val()).forEach(([id, info]) => { if (id !== currentUid && info.icon) usedIcons.add(info.icon); });
+  const available = RPG_ICONS.filter(icon => !usedIcons.has(icon));
+  return available.length ? available[Math.floor(Math.random() * available.length)] : "🎲";
+}
+
+function computeStats(rolls) {
+  $("stat-total").textContent = rolls.length;
+  $("stat-highest").textContent = rolls.length ? Math.max(...rolls.map(r => r.total ?? 0)) : 0;
+  $("stat-crits").textContent = rolls.filter(r => r.isCrit).length;
+}
+function renderFeed() {
+  let items = [...allRolls];
+  if (activeFilter === "mine")  items = items.filter(r => r.uid === uid);
+  if (activeFilter === "crits") items = items.filter(r => r.isCrit);
+  const feed = $("feed-list");
+  if (!items.length) { feed.innerHTML = '<div class="feed-empty">📜 Nenhum feito ainda.</div>'; return; }
+  feed.innerHTML = items.slice().reverse().map(r => `
+    <div class="feed-item ${r.isCrit?'is-crit':''} ${r.uid===uid?'is-mine':''}">
+      <div style="display:flex;justify-content:space-between">
+        <span>${r.playerIcon||'🎭'} ${esc(r.player)}
+          ${r.isCrit?'<span class="badge-rpg">CRÍTICO</span>':''}
+          ${r.isFumb?'<span class="badge-rpg">FUMBLE</span>':''}
+          ${r.uid===uid?'<span class="badge-rpg">VOCÊ</span>':''}
+        </span>
+        <span style="opacity:0.4;font-size:11px">${ago(r.ts)}</span>
+      </div>
+      <div style="margin-top:4px">${esc(r.formula)} = <strong style="color:var(--gold)">${r.total}</strong></div>
+      <div style="font-size:11px;opacity:0.5;margin-top:2px">${esc(r.breakdown)}</div>
+    </div>`).join('');
+}
+
+function initFeed(roomCode) {
+  if (feedUnsub) feedUnsub();
+  const rollsRef = ref(db, "rooms/" + roomCode + "/rolls");
+  let seenKeys = new Set(); let ready = false;
+  const unsubVal = onValue(rollsRef, snap => {
+    seenKeys = new Set(); allRolls = [];
+    if (snap.exists()) snap.forEach(c => { seenKeys.add(c.key); allRolls.push({ ...c.val(), _key: c.key }); });
+    computeStats(allRolls); renderFeed(); ready = true;
+  });
+  const unsubChild = onChildAdded(rollsRef, snap => {
+    if (!ready || seenKeys.has(snap.key)) return;
+    seenKeys.add(snap.key);
+    const newRoll = { ...snap.val(), _key: snap.key };
+    allRolls.push(newRoll); computeStats(allRolls); renderFeed();
+    if (lastRollId !== snap.key) {
+      lastRollId = snap.key;
+      setTimeout(() => showResult(newRoll.total, newRoll.isCrit ? "✦ CRÍTICO! ✦" : newRoll.isFumb ? "☠ FUMBLE ☠" : newRoll.formula), 100);
+    }
+  });
+  feedUnsub = () => { unsubVal(); unsubChild(); };
+}
+
+function initOnline(roomCode) {
+  if (onlineUnsub) onlineUnsub();
+  onlineUnsub = onValue(ref(db, `rooms/${roomCode}/online`), snap => {
+    const playersData = snap.val() || {};
+    $("online-count").textContent = Object.keys(playersData).length;
+    const container = document.getElementById("online-players-list");
+    if (container) container.innerHTML = Object.entries(playersData).map(([id, data]) =>
+      `<div class="player-icon-badge"><span>${data.icon||"🎲"}</span><span>${esc(data.name||"Anônimo")}</span></div>`).join('');
+  });
+}
+
+// ─── Sincronização de Rolagem para Outros Clientes ───────────────────────────
+// Recebe o comando com syncNotation (notação predeterminística) e anima
+// exatamente com os mesmos valores que o rolador já calculou.
 function initRollCommands(roomCode) {
-  if(rollCommandsUnsub) rollCommandsUnsub();
+  if (rollCommandsUnsub) rollCommandsUnsub();
   const commandsRef = ref(db, `rooms/${roomCode}/rollCommands`);
   rollCommandsUnsub = onChildAdded(commandsRef, async (snap) => {
     const cmd = snap.val();
-    // Ignora o próprio comando (rolador já animou localmente)
-    if(!cmd || cmd.uid === uid) return;
-    if(boxReady && Box) {
+    if (!cmd || cmd.uid === uid) return; // rolador já animou localmente
+    if (boxReady && Box) {
       try {
-        const icon = cmd.playerIcon || "🎲";
-        setStatus(icon, `${cmd.player} está rolando dados...`);
+        setStatus(cmd.playerIcon || "🎲", `${cmd.player} está rolando dados...`);
         $("dice-box-container").classList.add("rolling");
-        // syncNotation usa notação predeterminística "NdS@v1,v2,..."
-        // → a animação 3D para exatamente nos valores corretos para todos
-        const syncNotation = cmd.syncNotation || cmd.notation;
-        await rollDice3D(syncNotation);
+        // Usa syncSegments (array de segmentos predeterminísticos) para que
+        // a animação pare exatamente nos valores corretos — igual ao rolador
+        const segs = Array.isArray(cmd.syncSegments)
+          ? cmd.syncSegments
+          : [cmd.syncSegments || cmd.syncNotation || "1d6"]; // fallback
+        await rollDice3D(segs);
         hideStatus();
         setTimeout(() => $("dice-box-container").classList.remove("rolling"), 800);
-        await remove(ref(db, `rooms/${roomCode}/rollCommands/${snap.key}`));
-      } catch(e) { console.warn(e); hideStatus(); $("dice-box-container").classList.remove("rolling"); }
+      } catch(e) {
+        console.warn("Erro ao animar rolagem remota:", e);
+        hideStatus();
+        $("dice-box-container").classList.remove("rolling");
+      } finally {
+        // Limpa o comando do Firebase após processar
+        await remove(ref(db, `rooms/${roomCode}/rollCommands/${snap.key}`)).catch(()=>{});
+      }
     }
   });
 }
 
-async function enterRoom(code) { if(feedUnsub) feedUnsub(); if(onlineUnsub) onlineUnsub(); if(rollCommandsUnsub) rollCommandsUnsub(); room = code; const chosenIcon = await getAvailableIcon(room, uid); currentPlayerIcon = chosenIcon; const onRef = ref(db, `rooms/${code}/online/${uid}`); await set(onRef, { name: player, ts: serverTimestamp(), icon: chosenIcon }); onDisconnect(onRef).remove(); $("display-name").textContent = player; $("display-room-code").textContent = code; clearAll(); allRolls = []; activeFilter = "all"; screen("screen-room"); initFeed(code); initOnline(code); initRollCommands(code); requestAnimationFrame(() => initDiceBox()); }
-async function createRoom() { const gen=()=>{const L="ABCDEFGHJKLMNPQRSTUVWXYZ",D="23456789";let c=""; for(let i=0;i<3;i++)c+=L[Math.floor(Math.random()*L.length)]; for(let i=0;i<3;i++)c+=D[Math.floor(Math.random()*D.length)]; return c;}; let code=gen(),snap=await get(ref(db,`rooms/${code}`)); while(snap.exists()){code=gen();snap=await get(ref(db,`rooms/${code}`));} await enterRoom(code); }
-async function joinRoom() { const code=$("input-room-code").value.trim().toUpperCase(); if(code.length!==6) return; await enterRoom(code); }
-function leaveRoom() { if(room) remove(ref(db,`rooms/${room}/online/${uid}`)); if(feedUnsub) feedUnsub(); if(onlineUnsub) onlineUnsub(); if(rollCommandsUnsub) rollCommandsUnsub(); if(Box&&boxReady){try{Box.clear?.();}catch(e){}} room=""; $("join-form").style.display="none"; $("input-room-code").value=""; screen("screen-lobby"); }
-function resetName() { if(room) remove(ref(db,`rooms/${room}/online/${uid}`)); if(feedUnsub) feedUnsub(); if(onlineUnsub) onlineUnsub(); if(rollCommandsUnsub) rollCommandsUnsub(); room=""; $("input-name").value=""; $("input-room-code").value=""; screen("screen-name"); }
+async function enterRoom(code) {
+  if (feedUnsub) feedUnsub(); if (onlineUnsub) onlineUnsub(); if (rollCommandsUnsub) rollCommandsUnsub();
+  room = code;
+  const chosenIcon = await getAvailableIcon(room, uid);
+  currentPlayerIcon = chosenIcon;
+  const onRef = ref(db, `rooms/${code}/online/${uid}`);
+  await set(onRef, { name: player, ts: serverTimestamp(), icon: chosenIcon });
+  onDisconnect(onRef).remove();
+  $("display-name").textContent = player; $("display-room-code").textContent = code;
+  clearAll(); allRolls = []; activeFilter = "all";
+  screen("screen-room");
+  initFeed(code); initOnline(code); initRollCommands(code);
+  requestAnimationFrame(() => initDiceBox());
+}
+async function createRoom() {
+  const gen = () => { const L="ABCDEFGHJKLMNPQRSTUVWXYZ",D="23456789"; let c=""; for(let i=0;i<3;i++) c+=L[Math.floor(Math.random()*L.length)]; for(let i=0;i<3;i++) c+=D[Math.floor(Math.random()*D.length)]; return c; };
+  let code = gen(), snap = await get(ref(db, `rooms/${code}`));
+  while (snap.exists()) { code = gen(); snap = await get(ref(db, `rooms/${code}`)); }
+  await enterRoom(code);
+}
+async function joinRoom() {
+  const code = $("input-room-code").value.trim().toUpperCase();
+  if (code.length !== 6) return;
+  await enterRoom(code);
+}
+function leaveRoom() {
+  if (room) remove(ref(db, `rooms/${room}/online/${uid}`));
+  if (feedUnsub) feedUnsub(); if (onlineUnsub) onlineUnsub(); if (rollCommandsUnsub) rollCommandsUnsub();
+  if (Box && boxReady) { try { Box.clear?.(); } catch(e) {} }
+  room = ""; $("join-form").style.display = "none"; $("input-room-code").value = ""; screen("screen-lobby");
+}
+function resetName() {
+  if (room) remove(ref(db, `rooms/${room}/online/${uid}`));
+  if (feedUnsub) feedUnsub(); if (onlineUnsub) onlineUnsub(); if (rollCommandsUnsub) rollCommandsUnsub();
+  room = ""; $("input-name").value = ""; $("input-room-code").value = ""; screen("screen-name");
+}
 
-$("btn-name-next").onclick=()=>{ const n=$("input-name").value.trim(); if(!n) return; player=n; $("lobby-greeting").innerHTML=`Olá, ${esc(n)}! A Taverna te aguarda.`; screen("screen-lobby"); };
-$("input-name").addEventListener("keypress",e=>{if(e.key==="Enter")$("btn-name-next").click();});
-$("btn-back-name").onclick=e=>{e.preventDefault();resetName();};
-$("btn-create-room").onclick=()=>createRoom();
-$("btn-join-show").onclick=()=>{$("join-form").style.display="block";};
-$("btn-join-cancel").onclick=()=>{$("join-form").style.display="none";};
-$("btn-join-room").onclick=()=>joinRoom();
-$("input-room-code").addEventListener("keypress",e=>{if(e.key==="Enter")$("btn-join-room").click();});
-$("btn-leave-room").onclick=e=>{e.preventDefault();leaveRoom();};
-$("btn-change-name").onclick=e=>{e.preventDefault();resetName();};
-$("copy-code-btn").onclick=()=>{ if(!room) return; navigator.clipboard.writeText(room).then(()=>{ const h=$("copy-hint");h.textContent="✅";setTimeout(()=>h.textContent="📋",1500); }); };
-$("clear-btn").onclick =clearAll;
-$("btn-clear-history").onclick=async()=>{ if(room&&confirm("Apagar todos os feitos desta sala?")) await remove(ref(db,`rooms/${room}/rolls`)); };
-document.querySelectorAll("[data-filter]").forEach(btn=> btn.addEventListener("click",()=>{activeFilter=btn.dataset.filter;renderFeed();}));
-$("mod-plus").onclick =()=>{modifier++;updateModDisplay();updateFormula();};
-$("mod-minus").onclick=()=>{modifier--;updateModDisplay();updateFormula();};
+$("btn-name-next").onclick   = () => { const n = $("input-name").value.trim(); if (!n) return; player = n; $("lobby-greeting").innerHTML = `Olá, ${esc(n)}! A Taverna te aguarda.`; screen("screen-lobby"); };
+$("input-name").addEventListener("keypress", e => { if (e.key === "Enter") $("btn-name-next").click(); });
+$("btn-back-name").onclick   = e => { e.preventDefault(); resetName(); };
+$("btn-create-room").onclick  = () => createRoom();
+$("btn-join-show").onclick    = () => { $("join-form").style.display = "block"; };
+$("btn-join-cancel").onclick  = () => { $("join-form").style.display = "none"; };
+$("btn-join-room").onclick    = () => joinRoom();
+$("input-room-code").addEventListener("keypress", e => { if (e.key === "Enter") $("btn-join-room").click(); });
+$("btn-leave-room").onclick   = e => { e.preventDefault(); leaveRoom(); };
+$("btn-change-name").onclick  = e => { e.preventDefault(); resetName(); };
+$("copy-code-btn").onclick    = () => { if (!room) return; navigator.clipboard.writeText(room).then(() => { const h = $("copy-hint"); h.textContent = "✅"; setTimeout(() => h.textContent = "📋", 1500); }); };
+$("clear-btn").onclick        = clearAll;
+$("btn-clear-history").onclick = async () => { if (room && confirm("Apagar todos os feitos desta sala?")) await remove(ref(db, `rooms/${room}/rolls`)); };
+document.querySelectorAll("[data-filter]").forEach(btn => btn.addEventListener("click", () => { activeFilter = btn.dataset.filter; renderFeed(); }));
+$("mod-plus").onclick  = () => { modifier++; updateModDisplay(); updateFormula(); };
+$("mod-minus").onclick = () => { modifier--; updateModDisplay(); updateFormula(); };
 
-// ─── Rolagem com sincronização visual perfeita ────────────────────────────────
-// dice-box-threejs suporta notação predeterminística: "NdS@v1,v2,..."
-// Isso faz a animação 3D parar EXATAMENTE nos valores sorteados,
-// igual para todos os jogadores na sala.
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROLAGEM PRINCIPAL — corrigida para múltiplos dados + D100
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Gera valores aleatórios para cada dado selecionado
+// D100 real usa 2 dados d10 físicos:
+//   - dado de DEZENAS: valores 0,10,20,...,90  (rola d10, multiplica por 10)
+//   - dado de UNIDADES: valores 0,1,2,...,9   (rola d10, resultado 10 → 0)
+//   - resultado: tens + units, com 0+0 = 100
+function rollD100Single() {
+  const tens  = Math.floor(Math.random() * 10); // 0-9 → dezenas 00,10,...,90
+  const units = Math.floor(Math.random() * 10); // 0-9 → unidades 0,...,9
+  const total = (tens === 0 && units === 0) ? 100 : tens * 10 + units;
+  // Para animação 3D usamos 2× d10: o valor visual de cada dado d10 (1-10)
+  // tens_visual: 1-10 onde 10 = "00", 1="10", 2="20"... na face do dado
+  // units_visual: 1-10 onde 10 = "0"
+  const tensVisual  = tens  === 0 ? 10 : tens;   // face "00" é o valor 10 no d10
+  const unitsVisual = units === 0 ? 10 : units;  // face "0"  é o valor 10 no d10
+  return { total, tensVisual, unitsVisual, tens, units };
+}
+
+// Gera todos os resultados para os dados selecionados.
+// Cada item tem: { dieId, sides, val, notation3d }
+// d100 → 2 entradas d10 com os valores físicos corretos + total combinado
 function generateResults(sel) {
-  return sel.flatMap(d => {
+  const results = [];
+  for (const d of sel) {
     const n = counts[d.id];
-    return Array.from({ length: n }, () => ({
-      dieId: d.id,
-      sides: d.sides,
-      val: Math.floor(Math.random() * d.sides) + 1
-    }));
-  });
+    for (let i = 0; i < n; i++) {
+      if (d.id === "d100") {
+        const r = rollD100Single();
+        // Armazena como entrada única com total calculado corretamente
+        results.push({
+          dieId:      "d100",
+          sides:      100,
+          val:        r.total,           // valor final (1–100) para somar
+          tensVisual: r.tensVisual,      // face do dado de dezenas (para 3D)
+          unitsVisual:r.unitsVisual,     // face do dado de unidades (para 3D)
+          breakdown:  `d100=(${r.tens===0?'00':r.tens*10}+${r.units})→${r.total}`
+        });
+      } else {
+        const val = Math.floor(Math.random() * d.sides) + 1;
+        results.push({ dieId: d.id, sides: d.sides, val, breakdown: `${d.id}=${val}` });
+      }
+    }
+  }
+  return results;
 }
 
-// Constrói a notação predeterminística ex: "2d6@3,5+1d20@17"
-// Agrupa os resultados por tipo de dado para montar os segmentos
+// Constrói array de segmentos predeterminísticos para o dice-box-threejs.
+// Retorna array de strings ex: ["2d6@3,5", "1d20@17", "2d10@4,7"]
+// d100 → expande para 2 dados d10 físicos (dezenas + unidades)
+// IMPORTANTE: retorna array pois roll() só renderiza 1 tipo por chamada;
+//             tipos diferentes precisam de roll() + add() separados.
 function buildSyncNotation(results) {
-  // Agrupa em ordem de aparição mantendo sequência original
-  const groups = [];
-  let i = 0;
-  while (i < results.length) {
-    const sides = results[i].sides;
-    const slice = [];
-    while (i < results.length && results[i].sides === sides) {
-      slice.push(results[i].val);
-      i++;
+  // Expande d100 em 2 dados d10 físicos para a animação 3D
+  const expanded = [];
+  for (const r of results) {
+    if (r.dieId === "d100") {
+      expanded.push({ sides: 10, val: r.tensVisual });
+      expanded.push({ sides: 10, val: r.unitsVisual });
+    } else {
+      expanded.push({ sides: r.sides, val: r.val });
     }
-    groups.push(`${slice.length}d${sides}@${slice.join(",")}`);
   }
-  return groups.join("+");
+
+  // Agrupa todos os dados do mesmo tipo (sides) em um único segmento
+  // Usa Map para preservar ordem de aparição e juntar valores não-contíguos
+  // ex: 1d6 + 1d20 + 1d6 → Map: {6: [v1,v2], 20: [v3]} → ["2d6@v1,v2", "1d20@v3"]
+  const groups = new Map(); // sides → vals[]
+  for (const item of expanded) {
+    if (!groups.has(item.sides)) groups.set(item.sides, []);
+    groups.get(item.sides).push(item.val);
+  }
+
+  const segments = [];
+  for (const [sides, vals] of groups.entries()) {
+    segments.push(`${vals.length}d${sides}@${vals.join(",")}`);
+  }
+  return segments; // array de strings
 }
 
 async function roll() {
-  if(!room) return;
+  if (!room) return;
   const sel = DICE.filter(d => counts[d.id] > 0);
-  if(!sel.length) {
+  if (!sel.length) {
     const el = $("formula-display");
     el.style.animation = "shake 0.4s ease";
     setTimeout(() => el.style.animation = "", 500);
@@ -639,67 +834,73 @@ async function roll() {
   rollBtn.disabled = true;
 
   try {
-    // 1. Gerar resultados aleatórios ANTES de qualquer animação
+    // 1. Gerar todos os resultados aleatórios de uma só vez
     const results = generateResults(sel);
 
-    // 2. Construir notação predeterminística para sincronizar animação visual
-    //    Ex: "2d6@3,5+1d20@17" → dado para exatamente nesses números em todos os clientes
+    // 2. Notação predeterminística para sincronizar animação 3D entre clientes
+    //    d100 → 2× d10 com os valores físicos corretos
     const syncNotation = buildSyncNotation(results);
 
-    // Notação normal (sem @) para exibição na fórmula
+    // 3. Notação de fórmula legível para exibição (ex: "2d6+1d20+1d100")
     const formulaStr = sel.map(d => `${counts[d.id]}${d.id}`).join("+") +
       (modifier !== 0 ? (modifier > 0 ? `+${modifier}` : `${modifier}`) : "");
 
-    // 3. Publicar comando com syncNotation → outros clientes animam com os mesmos valores
+    // 4. Publicar comando de rolagem → outros clientes animam com os mesmos valores
+    //    syncSegments é array de strings (um por tipo de dado)
     await push(ref(db, `rooms/${room}/rollCommands`), {
       uid, player, playerIcon: currentPlayerIcon,
-      notation: syncNotation,   // para o rolador (unused, mas salvo)
-      syncNotation,             // notação predeterminística para os outros
+      syncSegments: syncNotation, // array ex: ["2d6@3,5","1d20@17"]
       ts: serverTimestamp()
     });
 
-    // 4. Animar localmente com os valores já determinados
+    // 5. Animar localmente com os segmentos predeterminísticos
     setStatus(currentPlayerIcon, "Rolando dados...");
     $("dice-box-container").classList.add("rolling");
-    await rollDice3D(syncNotation);
-
-    // 5. Calcular resultado final
-    const d100Count = counts["d100"] || 0;
-    let finalResults = results;
-    // Tratamento especial para d100 (tens + units combinados)
-    if(d100Count > 0) {
-      const d100Rolls = results.filter(r => r.dieId === "d100");
-      const others    = results.filter(r => r.dieId !== "d100");
-      finalResults = [...d100Rolls, ...others];
+    if (boxReady && Box) {
+      await rollDice3D(syncNotation); // syncNotation já é array de segmentos
     }
 
-    const total3d = finalResults.reduce((s, r) => s + r.val, 0);
-    const total   = total3d + modifier;
-    const breakdown = finalResults.map(r => `${r.dieId}=${r.val}`).join(", ") +
+    // 6. Calcular o total somando todos os resultados + modifier
+    const totalDice = results.reduce((s, r) => s + r.val, 0);
+    const total     = totalDice + modifier;
+
+    // Breakdown descritivo com lógica especial para d100
+    const breakdownParts = results.map(r => r.breakdown);
+    const breakdown = breakdownParts.join(", ") +
       (modifier !== 0 ? `, mod=${modifier > 0 ? "+" : ""}${modifier}` : "");
 
-    const isSingle = finalResults.length === 1;
-    const isCrit   = isSingle && finalResults[0].val === finalResults[0].sides;
-    const isFumb   = isSingle && finalResults[0].val === 1;
+    // Crítico / Fumble apenas quando há exatamente 1 dado (não d100 composto)
+    const isSingleNonD100 = results.length === 1 && results[0].dieId !== "d100";
+    const isCrit = isSingleNonD100 && results[0].val === results[0].sides;
+    const isFumb = isSingleNonD100 && results[0].val === 1;
+    // Para d100 único: crítico = 100, fumble = 1
+    const isSingleD100 = results.length === 1 && results[0].dieId === "d100";
+    const isCritD100   = isSingleD100 && results[0].val === 100;
+    const isFumbD100   = isSingleD100 && results[0].val === 1;
 
-    // 6. Salvar resultado correto no Firebase
+    const finalIsCrit = isCrit || isCritD100;
+    const finalIsFumb = isFumb || isFumbD100;
+
+    // 7. Persistir resultado no Firebase
     const newRollRef = await push(ref(db, `rooms/${room}/rolls`), {
       player, playerIcon: currentPlayerIcon,
-      formula: formulaStr, breakdown, total, isCrit, isFumb, uid,
+      formula: formulaStr, breakdown, total,
+      isCrit: finalIsCrit, isFumb: finalIsFumb, uid,
       ts: serverTimestamp()
     });
     lastRollId = newRollRef.key;
-    showResult(total, isCrit ? "✦ CRÍTICO! ✦" : isFumb ? "☠ FUMBLE ☠" : formulaStr);
+    showResult(total, finalIsCrit ? "✦ CRÍTICO! ✦" : finalIsFumb ? "☠ FUMBLE ☠" : formulaStr);
     _hasRolled = true;
 
   } catch(err) {
-    console.error(err);
+    console.error("Erro na rolagem:", err);
   } finally {
     rollBtn.disabled = false;
     setTimeout(() => $("dice-box-container").classList.remove("rolling"), 800);
     hideStatus();
   }
 }
+
 $("roll-btn").onclick = roll;
 renderDice(); updateFormula(); updateModDisplay();
 screen("screen-name");
