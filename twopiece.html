@@ -991,14 +991,20 @@ function initRollCommands(roomCode) {
   const commandsRef = ref(db, `rooms/${roomCode}/rollCommands`);
   rollCommandsUnsub = onChildAdded(commandsRef, async snap => {
     const cmd = snap.val();
+    // Ignora o próprio comando (rolador já animou localmente)
     if (!cmd || cmd.uid === uid) return;
     if (boxReady && Box) {
       try {
         setStatus(cmd.playerIcon || "☠", `${cmd.player} está rolando dados…`);
-        await Box.roll(cmd.notation);
+        $("dice-box-container").classList.add("rolling");
+        // syncNotation usa notação predeterminística "NdS@v1,v2,..."
+        // → a animação 3D para exatamente nos valores corretos para todos
+        const syncNotation = cmd.syncNotation || cmd.notation;
+        await Box.roll(syncNotation);
         hideStatus();
+        setTimeout(() => $("dice-box-container").classList.remove("rolling"), 800);
         await remove(ref(db, `rooms/${roomCode}/rollCommands/${snap.key}`));
-      } catch(e) { console.warn(e); }
+      } catch(e) { console.warn(e); hideStatus(); $("dice-box-container").classList.remove("rolling"); }
     }
   });
 }
@@ -1053,70 +1059,93 @@ function resetName() {
 }
 
 /* ── ROLL ── */
+// ── Rolagem com sincronização visual perfeita ────────────────────────────────
+// dice-box-threejs suporta notação predeterminística: "NdS@v1,v2,..."
+// Isso faz a animação 3D parar EXATAMENTE nos valores sorteados,
+// igual para todos os jogadores da sala.
+
+// Gera valores aleatórios para cada dado selecionado
+function generateResults(sel) {
+  return sel.flatMap(d =>
+    Array.from({ length: counts[d.id] }, () => ({
+      dieId: d.id, sides: d.sides,
+      val: Math.floor(Math.random() * d.sides) + 1
+    }))
+  );
+}
+
+// Constrói notação predeterminística: "2d6@3,5+1d20@17"
+// Agrupa por tipo de dado mantendo a ordem de aparição
+function buildSyncNotation(results) {
+  const groups = [];
+  let i = 0;
+  while (i < results.length) {
+    const sides = results[i].sides;
+    const vals = [];
+    while (i < results.length && results[i].sides === sides) {
+      vals.push(results[i].val);
+      i++;
+    }
+    groups.push(`${vals.length}d${sides}@${vals.join(",")}`);
+  }
+  return groups.join("+");
+}
+
 async function roll() {
   if(!room) return;
   const sel = DICE.filter(d => counts[d.id]>0);
   if(!sel.length){ showToast("Selecione pelo menos um dado!"); return; }
   $("roll-btn").disabled = true;
 
-  const notation = sel.map(d =>
-    d.id==="d100" ? counts[d.id]+"d100+"+counts[d.id]+"d10" : counts[d.id]+"d"+d.sides
-  ).join("+");
-
-  // Broadcast para outros jogadores verem a animação
-  await push(ref(db, `rooms/${room}/rollCommands`), {
-    uid, player, playerIcon: currentPlayerIcon, notation, ts: serverTimestamp()
-  });
-
   try {
+    // 1. Gerar resultados aleatórios ANTES de qualquer animação
+    const results = generateResults(sel);
+
+    // 2. Notação predeterminística → dado para exatamente nesses números
+    //    em TODOS os clientes (animação visual perfeita e sincronizada)
+    const syncNotation = buildSyncNotation(results);
+
+    // Notação legível para exibir na fórmula (sem @valores)
+    const formulaStr = sel.map(d => `${counts[d.id]}${d.id}`).join("+") +
+      (modifier !== 0 ? (modifier > 0 ? `+${modifier}` : `${modifier}`) : "");
+
+    // 3. Publicar comando com syncNotation → outros clientes animam com os mesmos valores
+    await push(ref(db, `rooms/${room}/rollCommands`), {
+      uid, player, playerIcon: currentPlayerIcon,
+      notation: syncNotation,
+      syncNotation,
+      ts: serverTimestamp()
+    });
+
+    // 4. Animar localmente com os valores já determinados
     setStatus(currentPlayerIcon, "Rolando dados…");
     $("dice-box-container").classList.add("rolling");
-    const raw = await Box.roll(notation);
-    let results=[], total3d=0;
-    if(raw && raw.sets && raw.sets.length) {
-      const d100Count = counts["d100"]||0;
-      const d100Sets = raw.sets.filter(s=>s.sides===100);
-      const d10CompSets = d100Count>0 ? raw.sets.filter(s=>s.sides===10).slice(0,d100Count) : [];
-      const otherSets = raw.sets.filter(s=>{
-        if(s.sides===100) return false;
-        if(s.sides===10 && d100Count>0 && d10CompSets.includes(s)) return false;
-        return true;
-      });
-      const paired = d100Sets.flatMap((set,idx) => {
-        const compSet = d10CompSets[idx];
-        return set.rolls.map((roll,rIdx) => {
-          const tens=roll.value??10, units=compSet?(compSet.rolls[rIdx]?.value??1):0;
-          const u=units===10?0:units;
-          const finalVal=(tens===0&&u===0)?100:(tens+u);
-          return { die:DICE.find(d=>d.id==="d100")??{id:"d100",sides:100}, val:finalVal };
-        });
-      });
-      const otherRes = otherSets.flatMap(set => set.rolls.map(roll => ({
-        die:DICE.find(d=>d.sides===set.sides)??{id:"d"+set.sides,sides:set.sides}, val:roll.value??1
-      })));
-      results=[...paired,...otherRes];
-      total3d=results.reduce((s,r)=>s+r.val,0);
-    } else {
-      results=sel.flatMap(d=>Array.from({length:counts[d.id]},()=>({ die:d, val:Math.floor(Math.random()*d.sides)+1 })));
-      total3d=results.reduce((s,r)=>s+r.val,0);
-    }
+    await Box.roll(syncNotation);
 
-    const total=total3d+modifier;
-    const breakdown=results.map(r=>`${r.die.id}=${r.val}`).join(", ")+(modifier!==0?`, mod=${modifier>0?"+":""}${modifier}`:"");
-    const isSingle=results.length===1;
-    const isCrit=isSingle && results[0].val===results[0].die.sides;
-    const isFumble=isSingle && results[0].val===1;
-    const formulaStr=sel.map(d=>`${counts[d.id]}${d.id}`).join("+")+( modifier!==0?(modifier>0?`+${modifier}`:`${modifier}`):"" );
+    // 5. Calcular resultado final
+    const total3d = results.reduce((s, r) => s + r.val, 0);
+    const total   = total3d + modifier;
+    const breakdown = results.map(r => `${r.dieId}=${r.val}`).join(", ") +
+      (modifier !== 0 ? `, mod=${modifier > 0 ? "+" : ""}${modifier}` : "");
 
-    const newRef = await push(ref(db,`rooms/${room}/rolls`),{
-      player, playerIcon:currentPlayerIcon, formula:formulaStr, breakdown, total, isCrit, isFumble, uid, ts:serverTimestamp()
+    const isSingle  = results.length === 1;
+    const isCrit    = isSingle && results[0].val === results[0].sides;
+    const isFumble  = isSingle && results[0].val === 1;
+
+    // 6. Salvar resultado correto no Firebase
+    const newRef = await push(ref(db, `rooms/${room}/rolls`), {
+      player, playerIcon: currentPlayerIcon,
+      formula: formulaStr, breakdown, total, isCrit, isFumble, uid,
+      ts: serverTimestamp()
     });
     lastRollId = newRef.key;
     _hasRolled = true;
-  } catch(err){ console.error(err); }
-  finally {
-    $("roll-btn").disabled=false;
-    setTimeout(()=>$("dice-box-container").classList.remove("rolling"),800);
+
+  } catch(err) {
+    console.error(err);
+  } finally {
+    $("roll-btn").disabled = false;
+    setTimeout(() => $("dice-box-container").classList.remove("rolling"), 800);
     hideStatus();
   }
 }
