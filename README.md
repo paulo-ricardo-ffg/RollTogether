@@ -17,9 +17,9 @@ https://paulo-ricardo-ffg.github.io/RollTogether/
 ---
 
 # 📸 Screenshots
-<img width="1920" height="966" alt="image" src="https://github.com/user-attachments/assets/fc60e592-ca91-47b4-bdda-2bffa023be3b" />
-<img width="1920" height="966" alt="image" src="https://github.com/user-attachments/assets/f3f1fd7a-e755-4a54-ae90-edee7fbd1940" />
-<img width="1920" height="1453" alt="image" src="https://github.com/user-attachments/assets/df078060-8352-44ae-aece-a149743740c8" />
+<img width="1920" height="966" alt="image" src="https://github.com/user-attachments/assets/ce63a4e8-5f17-416a-83dc-665338e9dfce" />
+<img width="1920" height="966" alt="image" src="https://github.com/user-attachments/assets/5bc15a12-6de1-42c0-b536-cb629685ba42" />
+<img width="1920" height="1543" alt="image" src="https://github.com/user-attachments/assets/0d33c6f6-c7d8-4066-9670-3356088b7361" />
 
 
 
