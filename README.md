@@ -171,7 +171,7 @@ RollTogether/
 │   └── dice-box-threejs.umd.js
 │
 ├── index.html
-├── twopiece.html
+├── twopiece.html (Personal use for my RPG)
 │
 ├── LICENSE
 ├── README.md
