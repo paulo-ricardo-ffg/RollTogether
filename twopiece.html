@@ -46,6 +46,19 @@
   --ease-out: cubic-bezier(0.16,1,0.3,1);
 }
 
+#skeletonRunner {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  width: 480px;
+  height: 480px;
+  transform: translate(-9999px, -50%);
+  pointer-events: none;
+  z-index: 10001;
+  display: none;
+  will-change: transform;
+}
+
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 html { scroll-behavior:smooth; }
 
@@ -721,41 +734,54 @@ function runSkeletonLocal() {
   if (skeletonRunning) return;
   skeletonRunning = true;
 
-  const runner = document.getElementById('skeletonRunner');
-  const img    = document.getElementById('skeletonImg');
-  if (!runner || !img) { skeletonRunning = false; return; }
+  const runner = document.getElementById("skeletonRunner");
+  const img = document.getElementById("skeletonImg");
 
-  img.src = './img/skeleton-run.gif?t=' + Date.now();
+  // Reinicia o GIF
+  img.src = "";
+  img.src = "./img/skeleton-run.gif?t=" + Date.now();
 
-  const startX = window.innerWidth + 20;
-  const endX   = -500;
+  const skeletonWidth = 480;
+  const startX = window.innerWidth + skeletonWidth;
+  const endX = -skeletonWidth;
 
-  // Posiciona fora da tela à direita ANTES de qualquer frame
-  runner.style.left = startX + 'px';
-  runner.style.display = 'block';
+  // Reseta completamente a posição
+  runner.style.display = "none";
+  runner.style.left = "0px";
+  runner.style.transform = `translate(${startX}px, -50%)`;
 
-  // Força o navegador a aplicar o estilo acima antes de animar
-  void runner.offsetWidth;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      runner.style.display = "block";
 
-  const duration  = 600;
-  const startTime = performance.now();
+      const duration = 600;
+      const startTime = performance.now();
 
-  function frame(now) {
-    const elapsed  = now - startTime;
-    const progress = Math.min(elapsed / duration, 1);
-    runner.style.left = (startX + (endX - startX) * progress) + 'px';
+      function animate(now) {
+        const progress = Math.min(
+          (now - startTime) / duration,
+          1
+        );
 
-    if (progress < 1) {
-      requestAnimationFrame(frame);
-    } else {
-      runner.style.display = 'none';
-      img.src = '';
-      img.style.transform = '';
-      skeletonRunning = false;
-    }
-  }
+        const x =
+          startX + (endX - startX) * progress;
 
-  requestAnimationFrame(frame);
+        runner.style.transform =
+          `translate(${x}px, -50%)`;
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          runner.style.display = "none";
+          runner.style.transform = `translate(${startX}px, -50%)`;
+          img.src = "";
+          skeletonRunning = false;
+        }
+      }
+
+      requestAnimationFrame(animate);
+    });
+  });
 }
 
 // Anima localmente + avisa o Firebase para todos na sala
@@ -782,22 +808,23 @@ function initSkeletonListener(code) {
     setTimeout(() => remove(ref(db, `rooms/${code}/skeletonRun/${snap.key}`)).catch(()=>{}), 1000);
   });
 }
-// ── TECLADO: ↑↑↓↓ = gif1 fullscreen | → → = esqueleto ────────────────
+// ── TECLADO: ↑↑↓↓ = gif1 fullscreen | N N = esqueleto ─────────────────
 let konamiSequence  = [];
 const konamiCode    = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown'];
-let arrowRightCount = 0;
-let arrowRightTimer = null;
+let nKeyCount = 0;
+let nKeyTimer = null;
 
 window.addEventListener('keydown', (e) => {
-  // → → (duas setas direita em menos de 600 ms) = esqueleto
-  if (e.key === 'ArrowRight') {
-    arrowRightCount++;
-    clearTimeout(arrowRightTimer);
-    if (arrowRightCount >= 2) {
-      arrowRightCount = 0;
+  // Tecla 'N' ou 'n' duas vezes em menos de 600 ms = esqueleto
+  if (e.key === 'n' || e.key === 'N') {
+    e.preventDefault(); // Evita digitar 'n' em inputs acidentalmente
+    nKeyCount++;
+    clearTimeout(nKeyTimer);
+    if (nKeyCount >= 2) {
+      nKeyCount = 0;
       runSkeleton();
     } else {
-      arrowRightTimer = setTimeout(() => { arrowRightCount = 0; }, 600);
+      nKeyTimer = setTimeout(() => { nKeyCount = 0; }, 600);
     }
     return;
   }
