@@ -7,9 +7,6 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☠️</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Cinzel+Decorative:wght@700;900&family=IM+Fell+English:ital@0;1&family=Pirata+One&display=swap" rel="stylesheet">
 <style>
-/* ══════════════════════════════════════
-   DESIGN TOKENS (mesmo código anterior)
-══════════════════════════════════════ */
 :root {
   --void: #03020a;
   --abyss: #060412;
@@ -61,7 +58,6 @@ body {
   cursor: default;
 }
 
-/* ATMOSPHERIC SCENE */
 .scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: radial-gradient(ellipse 130% 50% at 50% -5%, rgba(60,18,130,0.4) 0%, transparent 65%), radial-gradient(ellipse 60% 45% at 15% 25%, rgba(30,10,70,0.3) 0%, transparent 55%), radial-gradient(ellipse 50% 55% at 88% 15%, rgba(0,100,25,0.12) 0%, transparent 55%), linear-gradient(to bottom, var(--deep) 0%, var(--void) 50%, var(--abyss) 100%); }
 .clouds { position:fixed; inset:0; z-index:1; pointer-events:none; overflow:hidden; }
 .cloud { position:absolute; border-radius:50%; background: radial-gradient(ellipse at center, rgba(22,10,55,0.88) 0%, rgba(12,5,30,0.45) 55%, transparent 100%); animation: cdrift var(--d,40s) ease-in-out var(--dl,0s) infinite alternate; filter: blur(var(--b,20px)); }
@@ -88,14 +84,12 @@ body {
 @keyframes wave { 0%{transform:translateX(-4%) scaleY(1)} 100%{transform:translateX(4%) scaleY(1.25)} }
 .lightning-canvas { position:fixed; inset:0; z-index:5; pointer-events:none; }
 
-/* FOXY OVERLAY - Fullscreen */
+/* FOXY OVERLAY */
 .foxy-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: black;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: transparent;
   z-index: 10000;
   display: flex;
   align-items: center;
@@ -105,18 +99,28 @@ body {
   visibility: hidden;
   transition: opacity 0.3s ease, visibility 0.3s ease;
 }
-.foxy-overlay.show {
-  opacity: 1;
-  visibility: visible;
-}
+.foxy-overlay.show { opacity: 1; visibility: visible; }
 .foxy-overlay img {
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   object-fit: contain;
   display: block;
 }
 
-/* LAYOUT WRAPPER e outros estilos (mantidos) */
+/* SKELETON RUNNER */
+#skeletonRunner {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10001;
+  pointer-events: none;
+  display: none;
+}
+#skeletonRunner img {
+  width: 480px;
+  height: 226px;
+  display: block;
+}
+
 .wrapper { position:relative; z-index:10; max-width:1000px; margin:0 auto; padding:0 20px 120px; }
 header { text-align:center; padding:52px 0 40px; }
 .mast { display:inline-block; width:5px; height:72px; background: linear-gradient(to bottom, rgba(126,61,224,.9), rgba(58,24,120,.4)); border-radius:3px; box-shadow: 0 0 18px var(--glow-p), 0 0 40px rgba(126,61,224,.15); margin-bottom:-2px; }
@@ -284,7 +288,6 @@ h1 { font-family:'Cinzel Decorative', serif; font-size: clamp(30px, 7.5vw, 62px)
 </head>
 <body>
 
-<!-- SCENE LAYERS -->
 <div class="scene" aria-hidden="true"></div>
 <div class="clouds" id="clouds" aria-hidden="true"></div>
 <div class="spires" id="spires" aria-hidden="true"></div>
@@ -297,14 +300,17 @@ h1 { font-family:'Cinzel Decorative', serif; font-size: clamp(30px, 7.5vw, 62px)
 
 <!-- FOXY FULLSCREEN OVERLAY -->
 <div id="foxyOverlay" class="foxy-overlay">
-  <img src="./img/gif1.gif alt="FOXY JUMPSCARE">
+  <img id="foxyImg" src="" alt="FOXY JUMPSCARE">
 </div>
 
-<!-- UTILITIES -->
+<!-- SKELETON RUNNER -->
+<div id="skeletonRunner">
+  <img id="skeletonImg" src="" alt="">
+</div>
+
 <div class="loading off" id="loading"><div class="load-skull">☠️</div><div id="load-txt">Navegando pela tempestade…</div></div>
 <div class="toast" id="toast"></div>
 
-<!-- MAIN CONTENT WRAPPER -->
 <div class="wrapper">
   <header>
     <div style="display:flex;flex-direction:column;align-items:center;">
@@ -319,7 +325,6 @@ h1 { font-family:'Cinzel Decorative', serif; font-size: clamp(30px, 7.5vw, 62px)
     </div>
   </header>
 
-  <!-- SCREEN 1: NAME -->
   <div id="s-name">
     <div class="card" style="text-align:center;max-width:560px;margin:0 auto;">
       <span class="rune">⚔</span><span class="rune">⚔</span><span class="rune">⚔</span><span class="rune">⚔</span>
@@ -331,7 +336,6 @@ h1 { font-family:'Cinzel Decorative', serif; font-size: clamp(30px, 7.5vw, 62px)
     </div>
   </div>
 
-  <!-- SCREEN 2: LOBBY -->
   <div id="s-lobby" style="display:none;">
     <div class="card" style="text-align:center;max-width:560px;margin:0 auto;">
       <span class="rune">⚔</span><span class="rune">⚔</span><span class="rune">⚔</span><span class="rune">⚔</span>
@@ -362,7 +366,6 @@ h1 { font-family:'Cinzel Decorative', serif; font-size: clamp(30px, 7.5vw, 62px)
     </div>
   </div>
 
-  <!-- SCREEN 3: ROOM -->
   <div id="s-room" style="display:none;">
     <div class="pirate-bar">
       <div class="name-tag">
@@ -441,7 +444,6 @@ h1 { font-family:'Cinzel Decorative', serif; font-size: clamp(30px, 7.5vw, 62px)
 </div>
 
 <script>
-// Código atmosférico (nuvens, espirais, olhos, chuva, relâmpagos)
 (function(){
   const layer=document.getElementById('clouds');
   [{w:520,h:210,t:'2%',l:'-4%',b:24,dl:0,d:46,x:42,y:-14,x2:-26,y2:7},
@@ -552,7 +554,6 @@ h1 { font-family:'Cinzel Decorative', serif; font-size: clamp(30px, 7.5vw, 62px)
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, push, onValue, onChildAdded, set, remove, onDisconnect, serverTimestamp, get } from "firebase/database";
 
-// FIREBASE
 const app = initializeApp({
   apiKey: "AIzaSyC2P8eH2eSTLmhf60X-erQ6zu_dfgQmgtM",
   authDomain: "rolagem-de-dados-pirata.firebaseapp.com",
@@ -569,7 +570,6 @@ let player = "", room = "", playerIcon = "💀";
 let feedUnsub = null, onlineUnsub = null, cmdUnsub = null;
 let allRolls = [], activeFilter = "all", modifier = 0, lastRollId = null;
 
-// DICE CONFIG
 const DICE = [
   {id:"d4",sides:4},{id:"d6",sides:6},{id:"d8",sides:8},{id:"d10",sides:10},
   {id:"d12",sides:12},{id:"d20",sides:20},{id:"d100",sides:100}
@@ -699,6 +699,123 @@ async function cleanAllEmptyRooms() {
   try { const snap = await get(ref(db, "rooms")); if (!snap.exists()) return; const rooms = snap.val(); for (const roomId in rooms) { const online = rooms[roomId].online || {}; if (Object.keys(online).length === 0) { await remove(ref(db, `rooms/${roomId}`)); } } } catch (err) { console.warn(err); }
 }
 async function cleanupRoom(roomCode) { if (!roomCode) return; try { const onlineRef = ref(db, `rooms/${roomCode}/online`); const snap = await get(onlineRef); if (!snap.exists()) { await remove(ref(db, `rooms/${roomCode}`)); } } catch (err) { console.warn(err); } }
+
+// ── GIF1 FULLSCREEN: roda UMA VEZ ─────────────────────────────────────
+function showFoxyForEveryone() {
+  const overlay = document.getElementById('foxyOverlay');
+  const img     = document.getElementById('foxyImg');
+  if (!overlay || !img) return;
+
+  // Recria o src para forçar o gif a começar do frame 1
+  img.src = './img/gif1.gif?t=' + Date.now();
+  overlay.classList.add('show');
+
+  if (window.foxyTimeout) clearTimeout(window.foxyTimeout);
+  // Ajuste o valor abaixo para a duração real do gif1 em milissegundos
+  window.foxyTimeout = setTimeout(() => {
+    overlay.classList.remove('show');
+    img.src = '';
+  }, 800);
+}
+
+// ── ESQUELETO: corre da esquerda para direita, UMA VEZ ─────────────────
+let skeletonRunning = false;
+
+function runSkeleton() {
+  if (skeletonRunning) return;
+  skeletonRunning = true;
+
+  const runner = document.getElementById('skeletonRunner');
+  const img    = document.getElementById('skeletonImg');
+  if (!runner || !img) { skeletonRunning = false; return; }
+
+  img.src = './img/skeleton-run.gif?t=' + Date.now();
+
+  const startX = window.innerWidth + 20;
+  const endX   = -500;
+
+  // Posiciona fora da tela à direita ANTES de qualquer frame
+  runner.style.left = startX + 'px';
+  runner.style.display = 'block';
+
+  // Força o navegador a aplicar o estilo acima antes de animar
+  void runner.offsetWidth;
+
+  const duration  = 500;
+  const startTime = performance.now();
+
+  function frame(now) {
+    const elapsed  = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    runner.style.left = (startX + (endX - startX) * progress) + 'px';
+
+    if (progress < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      runner.style.display = 'none';
+      img.src = '';
+      img.style.transform = '';
+      skeletonRunning = false;
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+// ── TECLADO: ↑↑↓↓ = gif1 fullscreen | → → = esqueleto ────────────────
+let konamiSequence  = [];
+const konamiCode    = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown'];
+let arrowRightCount = 0;
+let arrowRightTimer = null;
+
+window.addEventListener('keydown', (e) => {
+  // → → (duas setas direita em menos de 600 ms) = esqueleto
+  if (e.key === 'ArrowRight') {
+    arrowRightCount++;
+    clearTimeout(arrowRightTimer);
+    if (arrowRightCount >= 2) {
+      arrowRightCount = 0;
+      runSkeleton();
+    } else {
+      arrowRightTimer = setTimeout(() => { arrowRightCount = 0; }, 600);
+    }
+    return;
+  }
+
+  // ↑↑↓↓ = gif1 fullscreen
+  if (!['ArrowUp','ArrowDown','ArrowLeft'].includes(e.key)) return;
+  konamiSequence.push(e.key);
+  if (konamiSequence.length > konamiCode.length) konamiSequence.shift();
+
+  const match = konamiSequence.length === konamiCode.length &&
+                konamiSequence.every((val, idx) => val === konamiCode[idx]);
+
+  if (match) {
+    showFoxyForEveryone();
+    konamiSequence = [];
+
+    // Avisar outros jogadores na mesma sala
+    if (room && uid) {
+      push(ref(db, `rooms/${room}/foxyScare`), {
+        uid, player, timestamp: serverTimestamp()
+      }).catch(err => console.warn('Erro enviando scare:', err));
+    }
+  }
+});
+
+// ── LISTENER FIREBASE: gif1 disparado por outro jogador ───────────────
+function initFoxyListener(code) {
+  const foxyRef = ref(db, `rooms/${code}/foxyScare`);
+  onChildAdded(foxyRef, (snap) => {
+    const data = snap.val();
+    if (data && data.uid !== uid) {
+      showFoxyForEveryone();
+      if (data.player) toast(`${data.player} invocou a fúria de Foxy!`, 'ok');
+      setTimeout(() => remove(ref(db, `rooms/${code}/foxyScare/${snap.key}`)).catch(()=>{}), 1000);
+    }
+  });
+}
+
 async function enterRoom(code) {
   await cleanAllEmptyRooms();
   if(feedUnsub)feedUnsub();if(onlineUnsub)onlineUnsub();if(cmdUnsub)cmdUnsub();
@@ -713,8 +830,10 @@ async function enterRoom(code) {
   document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('act',b.dataset.f==='all'));
   showScreen('s-room'); hideLoading();
   initFeed(code); initOnline(code); initCmds(code);
+  initFoxyListener(code);
   requestAnimationFrame(()=>initBox());
 }
+
 function genCode(){const L="ABCDEFGHJKLMNPQRSTUVWXYZ",D="23456789";let c='';for(let i=0;i<3;i++)c+=L[Math.floor(Math.random()*L.length)];for(let i=0;i<3;i++)c+=D[Math.floor(Math.random()*D.length)];return c;}
 async function createRoom(){showLoading('Invocando a sala…'); let code=genCode(),snap=await get(ref(db,`rooms/${code}`)); while(snap.exists()){code=genCode();snap=await get(ref(db,`rooms/${code}`));} await enterRoom(code);}
 async function joinRoom(){const code=document.getElementById('inp-code').value.trim().toUpperCase(); if(code.length!==6){toast('Código deve ter 6 caracteres!');return;} showLoading('Adentrando a ilha…'); await enterRoom(code);}
@@ -757,73 +876,6 @@ async function doRoll(){
   finally{ document.getElementById('roll-btn').disabled=false; setTimeout(()=>document.getElementById('dice-box').classList.remove('rolling'),800); hideStatus(); }
 }
 
-// KONAMI CODE (CIMA CIMA BAIXO BAIXO) - TODOS OS USUÁRIOS RECEBEM
-let konamiSequence = [];
-const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown'];
-
-function showFoxyForEveryone() {
-  const overlay = document.getElementById('foxyOverlay');
-  if (!overlay) return;
-  
-  if (window.foxyTimeout) clearTimeout(window.foxyTimeout);
-  
-  overlay.classList.add('show');
-  
-  window.foxyTimeout = setTimeout(() => {
-    overlay.classList.remove('show');
-  }, 3000);
-}
-
-window.addEventListener('keydown', (e) => {
-  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
-  
-  konamiSequence.push(e.key);
-  if (konamiSequence.length > konamiCode.length) konamiSequence.shift();
-  
-  const match = konamiSequence.length === konamiCode.length && 
-                konamiSequence.every((val, idx) => val === konamiCode[idx]);
-  
-  if (match) {
-    showFoxyForEveryone();
-    konamiSequence = [];
-    
-    // Se estiver em uma sala, enviar comando para todos os outros jogadores
-    if (room && uid) {
-      push(ref(db, `rooms/${room}/foxyScare`), {
-        uid: uid,
-        player: player,
-        timestamp: serverTimestamp()
-      }).catch(err => console.warn('Erro enviando scare:', err));
-    }
-  }
-});
-
-// Escutar comandos de Foxy de outros jogadores
-function initFoxyListener(code) {
-  const foxyRef = ref(db, `rooms/${code}/foxyScare`);
-  onChildAdded(foxyRef, (snap) => {
-    const data = snap.val();
-    if (data && data.uid !== uid) {
-      // Mostrar o scare para este usuário também
-      showFoxyForEveryone();
-      // Opcional: mostrar toast avisando quem ativou
-      if (data.player) {
-        toast(`${data.player} invocou a fúria de Foxy!`, 'ok');
-      }
-      // Remover após 1 segundo para não acumular
-      setTimeout(() => remove(ref(db, `rooms/${code}/foxyScare/${snap.key}`)).catch(()=>{}), 1000);
-    }
-  });
-}
-
-// Modificar enterRoom para incluir o listener do Foxy
-const originalEnterRoom = enterRoom;
-enterRoom = async function(code) {
-  await originalEnterRoom(code);
-  initFoxyListener(code);
-};
-
-// EVENT BINDINGS
 document.getElementById('btn-name').onclick=()=>{const n=document.getElementById('inp-name').value.trim();if(!n){toast('Digite um nome, alma perdida!');return;}player=n;document.getElementById('lobby-greet').textContent=`A ilha aguarda por você, ${n}…`;showScreen('s-lobby');};
 document.getElementById('inp-name').onkeypress=e=>{if(e.key==='Enter')document.getElementById('btn-name').click();};
 document.getElementById('btn-back').onclick=e=>{e.preventDefault();resetName();};
