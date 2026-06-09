@@ -705,23 +705,19 @@ function showFoxyForEveryone() {
   const overlay = document.getElementById('foxyOverlay');
   const img     = document.getElementById('foxyImg');
   if (!overlay || !img) return;
-
-  // Recria o src para forçar o gif a começar do frame 1
   img.src = './img/gif1.gif?t=' + Date.now();
   overlay.classList.add('show');
-
   if (window.foxyTimeout) clearTimeout(window.foxyTimeout);
-  // Ajuste o valor abaixo para a duração real do gif1 em milissegundos
   window.foxyTimeout = setTimeout(() => {
     overlay.classList.remove('show');
     img.src = '';
   }, 800);
 }
 
-// ── ESQUELETO: corre da esquerda para direita, UMA VEZ ─────────────────
+// ── ESQUELETO: só anima localmente (sem push Firebase) ─────────────────
 let skeletonRunning = false;
 
-function runSkeleton() {
+function runSkeletonLocal() {
   if (skeletonRunning) return;
   skeletonRunning = true;
 
@@ -762,6 +758,28 @@ function runSkeleton() {
   requestAnimationFrame(frame);
 }
 
+// Anima localmente + avisa o Firebase para todos na sala
+function runSkeleton() {
+  runSkeletonLocal();
+  if (room && uid) {
+    push(ref(db, `rooms/${room}/skeletonRun`), {
+      uid, player, timestamp: serverTimestamp()
+    }).catch(err => console.warn('Erro enviando skeleton:', err));
+  }
+}
+
+// ── LISTENER FIREBASE: esqueleto disparado por outro jogador ──────────
+function initSkeletonListener(code) {
+  const skelRef = ref(db, `rooms/${code}/skeletonRun`);
+  onChildAdded(skelRef, (snap) => {
+    const data = snap.val();
+    if (data && data.uid !== uid) {
+      runSkeletonLocal();
+      setTimeout(() => remove(ref(db, `rooms/${code}/skeletonRun/${snap.key}`)).catch(()=>{}), 1000);
+    }
+  });
+}
+
 // ── TECLADO: ↑↑↓↓ = gif1 fullscreen | → → = esqueleto ────────────────
 let konamiSequence  = [];
 const konamiCode    = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown'];
@@ -793,8 +811,6 @@ window.addEventListener('keydown', (e) => {
   if (match) {
     showFoxyForEveryone();
     konamiSequence = [];
-
-    // Avisar outros jogadores na mesma sala
     if (room && uid) {
       push(ref(db, `rooms/${room}/foxyScare`), {
         uid, player, timestamp: serverTimestamp()
@@ -831,6 +847,7 @@ async function enterRoom(code) {
   showScreen('s-room'); hideLoading();
   initFeed(code); initOnline(code); initCmds(code);
   initFoxyListener(code);
+  initSkeletonListener(code);
   requestAnimationFrame(()=>initBox());
 }
 
