@@ -218,6 +218,73 @@ h1{font-family:var(--f-display);font-size:clamp(28px,7vw,64px);font-weight:900;l
 #screen-name,#screen-lobby,#screen-room{animation:fadein 0.4s ease}
 @keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 #roll-btn:disabled{opacity:0.45;cursor:not-allowed;filter:grayscale(0.6)}
+
+/* ── Toast de feedback ── */
+#toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);z-index:9999;
+  background:rgba(20,14,34,0.97);border:1px solid var(--gold-dusk);border-radius:var(--r-pill);
+  padding:10px 28px;font-family:var(--f-title);font-size:12px;letter-spacing:2px;color:var(--gold);
+  box-shadow:0 8px 32px rgba(0,0,0,0.7),var(--glow-gold);opacity:0;pointer-events:none;
+  transition:opacity 0.25s,transform 0.25s;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+
+/* ── Breakdown visual aprimorado ── */
+.breakdown-visual{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:10px}
+.breakdown-die-chip{background:rgba(14,10,28,0.9);border:1px solid rgba(232,201,106,0.22);border-radius:12px;
+  padding:8px 16px;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:60px}
+.breakdown-die-name{font-family:var(--f-title);font-size:9px;letter-spacing:2px;color:var(--gold-dusk);text-transform:uppercase}
+.breakdown-die-val{font-family:var(--f-title);font-size:26px;font-weight:700;color:var(--gold);line-height:1}
+.breakdown-die-chip.is-mod{border-color:rgba(100,180,100,0.3)}
+.breakdown-die-chip.is-mod .breakdown-die-name{color:#7dcf7d}
+.breakdown-die-chip.is-mod .breakdown-die-val{color:#7dcf7d;font-size:22px}
+.breakdown-die-chip.is-crit-chip{border-color:rgba(255,200,60,0.6);box-shadow:0 0 12px rgba(255,200,60,0.2)}
+.breakdown-die-chip.is-fumble-chip{border-color:rgba(200,60,60,0.5);box-shadow:0 0 12px rgba(200,60,60,0.15)}
+.breakdown-total-row{width:100%;display:flex;align-items:center;justify-content:center;gap:14px;
+  margin-top:6px;padding-top:10px;border-top:1px solid rgba(232,201,106,0.12)}
+.breakdown-equals{font-family:var(--f-title);font-size:20px;color:var(--vellum);opacity:0.4}
+.breakdown-total-val{font-family:var(--f-display);font-size:44px;font-weight:900;color:var(--gold-hot);
+  text-shadow:0 0 20px rgba(255,200,60,0.4);line-height:1}
+.breakdown-formula-str{font-family:var(--f-title);font-size:11px;letter-spacing:2px;color:var(--vellum);opacity:0.5;text-align:center;margin-top:4px}
+.breakdown-label-badge{background:rgba(74,45,110,0.4);border:1px solid rgba(232,201,106,0.15);border-radius:20px;
+  padding:2px 12px;font-family:var(--f-title);font-size:9px;letter-spacing:2px;color:var(--vellum);opacity:0.7;margin-bottom:4px;display:inline-block}
+.feed-breakdown-visual{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.feed-chip{background:rgba(10,7,20,0.8);border:1px solid rgba(232,201,106,0.15);border-radius:8px;
+  padding:4px 10px;display:flex;flex-direction:column;align-items:center;min-width:44px}
+.feed-chip-name{font-family:var(--f-title);font-size:7px;letter-spacing:1px;color:var(--gold-dusk);text-transform:uppercase}
+.feed-chip-val{font-family:var(--f-title);font-size:18px;font-weight:700;color:var(--gold);line-height:1.1}
+.feed-chip.mod-chip .feed-chip-name{color:#7dcf7d}
+.feed-chip.mod-chip .feed-chip-val{color:#7dcf7d;font-size:15px}
+.feed-total-line{display:flex;align-items:baseline;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(232,201,106,0.08)}
+.feed-total-num{font-family:var(--f-display);font-size:32px;font-weight:900;color:var(--gold-hot);text-shadow:0 0 12px rgba(255,200,60,0.3);line-height:1}
+.feed-formula-small{font-family:var(--f-title);font-size:10px;color:var(--vellum);opacity:0.4;letter-spacing:1px}
+.feed-roll-label{font-family:var(--f-body);font-style:italic;font-size:12px;color:var(--vellum);opacity:0.6;margin-bottom:4px}
+
+/* ── Modifier com reset ── */
+.mod-reset{background:none;border:none;cursor:pointer;color:rgba(232,201,106,0.25);font-size:11px;
+  font-family:var(--f-title);letter-spacing:1px;transition:color 0.2s;padding:2px 6px;border-radius:6px}
+.mod-reset:hover{color:var(--gold-dusk)}
+.mod-reset:focus-visible{outline:2px solid var(--gold-dusk);outline-offset:2px}
+
+/* ── Feed timestamp legível ── */
+.feed-timestamp{font-family:var(--f-title);font-size:10px;color:var(--vellum);opacity:0.35;white-space:nowrap}
+
+/* ── Acessibilidade: foco visível em todos os botões ── */
+button:focus-visible,.btn-forjado:focus-visible,.die-runa:focus-visible,.codigo-sala:focus-visible{
+  outline:2px solid var(--gold);outline-offset:3px}
+
+/* ── Mobile melhorias ── */
+@media(max-width:480px){
+  .wrapper{padding:16px 14px 80px}
+  .top-bar-rpg{padding:10px 14px;gap:8px}
+  .modificador-forja{padding:8px 14px;gap:12px}
+  .lobby-card{padding:28px 20px}
+  .name-card{padding:36px 24px}
+  .roll-label-input{font-size:16px} /* evita zoom no iOS */
+  .input-rpg{font-size:16px} /* evita zoom no iOS */
+  .breakdown-total-val{font-size:36px}
+  .feed-total-num{font-size:26px}
+  .die-img{width:38px;height:38px}
+}
 </style>
 </head>
 <body>
@@ -231,6 +298,8 @@ h1{font-family:var(--f-display);font-size:clamp(28px,7vw,64px);font-weight:900;l
 <div class="rune-bg rune-6">ᛟᛞᛁᚾ</div>
 <div class="rune-bg rune-7">ᚦᛟᚱ</div>
 <div class="rune-bg rune-8">ᛚᚨᚷᚢᛉ</div>
+
+<div id="toast"></div>
 
 <div id="result-floater"></div>
 <div id="result-label"></div>
@@ -268,8 +337,8 @@ h1{font-family:var(--f-display);font-size:clamp(28px,7vw,64px);font-weight:900;l
       <div class="lobby-title">Taverna dos Dados</div>
       <p id="lobby-greeting" class="lobby-greeting">Pronto para a aventura!</p>
       <div class="lobby-actions">
-        <div class="btn-forjado btn-ouro" id="btn-create-room">✨ Criar Nova Sala</div>
-        <div class="btn-forjado" id="btn-join-show">🔑 Entrar por Código</div>
+        <button class="btn-forjado btn-ouro" id="btn-create-room">✨ Criar Nova Sala</button>
+        <button class="btn-forjado" id="btn-join-show">🔑 Entrar por Código</button>
       </div>
       <div id="join-form" style="display:none" class="join-form-container">
         <span class="join-label">Código Rúnico</span>
@@ -296,7 +365,7 @@ h1{font-family:var(--f-display);font-size:clamp(28px,7vw,64px);font-weight:900;l
         </div>
       </div>
       <div class="top-bar-meta">
-        <div class="codigo-sala" id="copy-code-btn">
+        <div class="codigo-sala" id="copy-code-btn" role="button" tabindex="0" aria-label="Copiar código da sala">
           📜 <span id="display-room-code">——</span> <span id="copy-hint">📋</span>
         </div>
         <div class="online-pill">
@@ -321,9 +390,12 @@ h1{font-family:var(--f-display);font-size:clamp(28px,7vw,64px);font-weight:900;l
       <div class="dice-grimorio" id="dice-grid"></div>
       <div class="modificador-forja">
         <span class="mod-titulo">Bônus / Maldição</span>
-        <button class="mod-botao" id="mod-minus">−</button>
-        <div class="mod-valor" id="mod-display">+0</div>
-        <button class="mod-botao" id="mod-plus">+</button>
+        <button class="mod-botao" id="mod-minus" aria-label="Diminuir modificador">−</button>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+          <div class="mod-valor" id="mod-display">+0</div>
+          <button class="mod-reset" id="mod-reset" aria-label="Zerar modificador">resetar</button>
+        </div>
+        <button class="mod-botao" id="mod-plus" aria-label="Aumentar modificador">+</button>
       </div>
       <div class="formula-runica">
         <span class="formula-label">⚡ Fórmula Mágica ⚡</span>
@@ -578,6 +650,15 @@ function setStatus(icon, txt) {
 function hideStatus() { const el = document.getElementById("dice-status"); if (el) el.classList.add("gone"); }
 
 const $ = id => document.getElementById(id);
+function showToast(msg, duration = 1800) {
+  const t = document.getElementById("toast");
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("show"), duration);
+}
+
 function screen(id) {
   ["screen-name","screen-lobby","screen-room"].forEach(s => $(s).style.display = s === id ? "block" : "none");
   if (document.querySelector('.hero')) document.querySelector('.hero').style.display = id === 'screen-room' ? 'none' : 'block';
@@ -645,25 +726,56 @@ function computeStats(rolls) {
   $("stat-highest").textContent = rolls.length ? Math.max(...rolls.map(r => r.total ?? 0)) : 0;
   $("stat-crits").textContent = rolls.filter(r => r.isCrit).length;
 }
+function parseBreakdownChips(breakdown, formula, total, modifier) {
+  // breakdown ex: "d6=3, d20=17, mod=+2"
+  const chips = [];
+  if (!breakdown) return chips;
+  const parts = breakdown.split(",").map(s => s.trim());
+  for (const p of parts) {
+    const modMatch = p.match(/^mod=([+\-]\d+)$/);
+    if (modMatch) { chips.push({ name: "Mod", val: modMatch[1], isMod: true }); continue; }
+    const dieMatch = p.match(/^(d\d+(?:\([^)]+\))?)=(.+)$/i);
+    if (dieMatch) { chips.push({ name: dieMatch[1].replace(/\(.*\)/,""), val: dieMatch[2] }); continue; }
+    const d100Match = p.match(/^d100=\((.+)\)→(\d+)$/);
+    if (d100Match) { chips.push({ name: "d100", val: d100Match[2] }); continue; }
+  }
+  return chips;
+}
+
 function renderFeed() {
   let items = [...allRolls];
   if (activeFilter === "mine")  items = items.filter(r => r.uid === uid);
   if (activeFilter === "crits") items = items.filter(r => r.isCrit);
   const feed = $("feed-list");
-  if (!items.length) { feed.innerHTML = '<div class="feed-empty">📜 Nenhum feito ainda.</div>'; return; }
-  feed.innerHTML = items.slice().reverse().map(r => `
-    <div class="feed-item ${r.isCrit?'is-crit':''} ${r.uid===uid?'is-mine':''}">
-      <div style="display:flex;justify-content:space-between">
-        <span>${r.playerIcon||'🎭'} ${esc(r.player)}
+  if (!items.length) { feed.innerHTML = '<div class="feed-empty">📜 Nenhuma rolagem ainda. O destino espera!</div>'; return; }
+  feed.innerHTML = items.slice().reverse().map(r => {
+    const chips = parseBreakdownChips(r.breakdown, r.formula, r.total, 0);
+    const chipsHtml = chips.length ? `
+      <div class="feed-breakdown-visual">
+        ${chips.map(c => `<div class="feed-chip ${c.isMod ? 'mod-chip' : ''}">
+          <span class="feed-chip-name">${esc(c.name)}</span>
+          <span class="feed-chip-val">${esc(c.val)}</span>
+        </div>`).join('')}
+      </div>` : `<div style="font-size:11px;opacity:0.45;margin-top:4px">${esc(r.breakdown)}</div>`;
+    const ts = r.ts ? new Date(r.ts).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}) : '';
+    const rollLabelHtml = r.rollLabel ? `<div class="feed-roll-label">⚔️ ${esc(r.rollLabel)}</div>` : '';
+    return `<div class="feed-item ${r.isCrit?'is-crit':''} ${r.uid===uid?'is-mine':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <span style="font-size:13px">${r.playerIcon||'🎭'} <strong>${esc(r.player)}</strong>
           ${r.isCrit?'<span class="badge-rpg">CRÍTICO</span>':''}
           ${r.isFumb?'<span class="badge-rpg">FUMBLE</span>':''}
           ${r.uid===uid?'<span class="badge-rpg">VOCÊ</span>':''}
         </span>
-        <span style="opacity:0.4;font-size:11px">${ago(r.ts)}</span>
+        <span class="feed-timestamp">${ts}</span>
       </div>
-      <div style="margin-top:4px">${esc(r.formula)} = <strong style="color:var(--gold)">${r.total}</strong></div>
-      <div style="font-size:11px;opacity:0.5;margin-top:2px">${esc(r.breakdown)}</div>
-    </div>`).join('');
+      ${rollLabelHtml}
+      ${chipsHtml}
+      <div class="feed-total-line">
+        <span class="feed-total-num">${r.total}</span>
+        <span class="feed-formula-small">${esc(r.formula)}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function initFeed(roomCode) {
@@ -875,12 +987,14 @@ $("btn-change-name").onclick = async e => {
   e.preventDefault();
   await resetName();
 };
-$("copy-code-btn").onclick    = () => { if (!room) return; navigator.clipboard.writeText(room).then(() => { const h = $("copy-hint"); h.textContent = "✅"; setTimeout(() => h.textContent = "📋", 1500); }); };
+$("copy-code-btn").onclick    = () => { if (!room) return; navigator.clipboard.writeText(room).then(() => { showToast("✅ Código copiado!"); const h = $("copy-hint"); h.textContent = "✅"; setTimeout(() => h.textContent = "📋", 1500); }); };
+$("copy-code-btn").addEventListener("keypress", e => { if (e.key === "Enter" || e.key === " ") $("copy-code-btn").click(); });
 $("clear-btn").onclick        = clearAll;
 $("btn-clear-history").onclick = async () => { if (room && confirm("Apagar todos os feitos desta sala?")) await remove(ref(db, `rooms/${room}/rolls`)); };
 document.querySelectorAll("[data-filter]").forEach(btn => btn.addEventListener("click", () => { activeFilter = btn.dataset.filter; renderFeed(); }));
 $("mod-plus").onclick  = () => { modifier++; updateModDisplay(); updateFormula(); };
 $("mod-minus").onclick = () => { modifier--; updateModDisplay(); updateFormula(); };
+$("mod-reset").onclick = () => { modifier = 0; updateModDisplay(); updateFormula(); };
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROLAGEM PRINCIPAL — corrigida para múltiplos dados + D100
@@ -1024,10 +1138,12 @@ async function roll() {
     const finalIsFumb = isFumb || isFumbD100;
 
     // 7. Persistir resultado no Firebase
+    const rollLabel = ($("roll-label-input")?.value.trim()) || "";
     const newRollRef = await push(ref(db, `rooms/${room}/rolls`), {
       player, playerIcon: currentPlayerIcon,
       formula: formulaStr, breakdown, total,
       isCrit: finalIsCrit, isFumb: finalIsFumb, uid,
+      rollLabel,
       ts: serverTimestamp()
     });
     lastRollId = newRollRef.key;
