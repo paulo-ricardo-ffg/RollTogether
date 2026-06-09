@@ -737,7 +737,7 @@ function runSkeletonLocal() {
   // Força o navegador a aplicar o estilo acima antes de animar
   void runner.offsetWidth;
 
-  const duration  = 500;
+  const duration  = 600;
   const startTime = performance.now();
 
   function frame(now) {
@@ -763,23 +763,25 @@ function runSkeleton() {
   runSkeletonLocal();
   if (room && uid) {
     push(ref(db, `rooms/${room}/skeletonRun`), {
-      uid, player, timestamp: serverTimestamp()
+      uid, player, clientTs: Date.now(), timestamp: serverTimestamp()
     }).catch(err => console.warn('Erro enviando skeleton:', err));
   }
 }
 
-// ── LISTENER FIREBASE: esqueleto disparado por outro jogador ──────────
+// ── LISTENER FIREBASE: esqueleto disparado por outro jogador ────────────
 function initSkeletonListener(code) {
   const skelRef = ref(db, `rooms/${code}/skeletonRun`);
+  const listenSince = Date.now();
   onChildAdded(skelRef, (snap) => {
     const data = snap.val();
-    if (data && data.uid !== uid) {
-      runSkeletonLocal();
-      setTimeout(() => remove(ref(db, `rooms/${code}/skeletonRun/${snap.key}`)).catch(()=>{}), 1000);
-    }
+    if (!data || data.uid === uid) return;
+    // Ignora eventos velhos que já estavam no nó antes de entrar na sala
+    if ((data.clientTs || 0) < listenSince - 3000) return;
+    skeletonRunning = false;
+    runSkeletonLocal();
+    setTimeout(() => remove(ref(db, `rooms/${code}/skeletonRun/${snap.key}`)).catch(()=>{}), 1000);
   });
 }
-
 // ── TECLADO: ↑↑↓↓ = gif1 fullscreen | → → = esqueleto ────────────────
 let konamiSequence  = [];
 const konamiCode    = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown'];
@@ -826,7 +828,6 @@ function initFoxyListener(code) {
     const data = snap.val();
     if (data && data.uid !== uid) {
       showFoxyForEveryone();
-      if (data.player) toast(`${data.player} invocou a fúria de Foxy!`, 'ok');
       setTimeout(() => remove(ref(db, `rooms/${code}/foxyScare/${snap.key}`)).catch(()=>{}), 1000);
     }
   });
