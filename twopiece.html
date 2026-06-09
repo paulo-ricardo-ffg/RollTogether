@@ -126,6 +126,22 @@ body {
   display: block;
 }
 
+/* DANCING SKELETON */
+#dancingSkeleton {
+  position: fixed;
+  width: 220px;
+  height: 220px;
+  pointer-events: none;
+  z-index: 99999;
+  display: none;
+  will-change: transform;
+}
+#dancingSkeleton img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .wrapper { position:relative; z-index:10; max-width:1000px; margin:0 auto; padding:0 20px 120px; }
 header { text-align:center; padding:52px 0 40px; }
 .mast { display:inline-block; width:5px; height:72px; background: linear-gradient(to bottom, rgba(126,61,224,.9), rgba(58,24,120,.4)); border-radius:3px; box-shadow: 0 0 18px var(--glow-p), 0 0 40px rgba(126,61,224,.15); margin-bottom:-2px; }
@@ -311,6 +327,11 @@ h1 { font-family:'Cinzel Decorative', serif; font-size: clamp(30px, 7.5vw, 62px)
 <!-- SKELETON RUNNER -->
 <div id="skeletonRunner">
   <img id="skeletonImg" src="" alt="">
+</div>
+
+<!-- DANCING SKELETON -->
+<div id="dancingSkeleton">
+  <img id="danceImg" src="" alt="">
 </div>
 
 <div class="loading off" id="loading"><div class="load-skull">☠️</div><div id="load-txt">Navegando pela tempestade…</div></div>
@@ -709,23 +730,20 @@ async function cleanupRoom(roomCode) { if (!roomCode) return; try { const online
 // EVENTOS DE SALA — tudo passa pelo Firebase, inclusive quem dispara
 // ══════════════════════════════════════════════════════════════════════
 
-// Dispara um evento para TODOS (incluindo si mesmo) via Firebase
-function broadcastEvent(eventName) {
+function broadcastEvent(eventName, extra) {
   if (!room || !uid) return;
   push(ref(db, `rooms/${room}/${eventName}`), {
-    uid, player, clientTs: Date.now(), timestamp: serverTimestamp()
+    uid, player, clientTs: Date.now(), timestamp: serverTimestamp(), ...(extra||{})
   }).catch(err => console.warn(`Erro broadcast ${eventName}:`, err));
 }
 
-// Registra listener que executa localFn para TODOS (incluindo quem enviou)
 function initRoomListener(code, eventName, localFn) {
   const listenSince = Date.now();
   onChildAdded(ref(db, `rooms/${code}/${eventName}`), (snap) => {
     const data = snap.val();
     if (!data) return;
-    // ignora eventos antigos de antes de entrar na sala
     if ((data.clientTs || 0) < listenSince - 3000) return;
-    localFn();
+    localFn(data);
     setTimeout(() => remove(ref(db, `rooms/${code}/${eventName}/${snap.key}`)).catch(()=>{}), 2000);
   });
 }
@@ -745,50 +763,100 @@ function showFoxyLocal() {
 }
 
 // ── GNOME AUDIO ────────────────────────────────────────────────────────
+let _gnomeBuf = null;
+let _actx = null;
+
+function _initAudio() {
+  if (_actx) return;
+  try {
+    _actx = new (window.AudioContext || window.webkitAudioContext)();
+    fetch('./img/gnome.mp3')
+      .then(r => r.arrayBuffer())
+      .then(buf => _actx.decodeAudioData(buf))
+      .then(decoded => { _gnomeBuf = decoded; })
+      .catch(() => {});
+  } catch(e) {}
+}
+['click','keydown','touchstart'].forEach(ev =>
+  document.addEventListener(ev, _initAudio, { once: true, passive: true })
+);
+
 function playGnomeLocal() {
-  const a = new Audio('./img/gnome.mp3');
-  a.play().catch(() => {});
+  if (_actx && _gnomeBuf) {
+    try {
+      if (_actx.state === 'suspended') _actx.resume();
+      const src = _actx.createBufferSource();
+      src.buffer = _gnomeBuf;
+      src.connect(_actx.destination);
+      src.start(0);
+      return;
+    } catch(e) {}
+  }
+  new Audio('./img/gnome.mp3').play().catch(() => {});
 }
 
-// ── ESQUELETO ──────────────────────────────────────────────────────────
+// ── ESQUELETO CORRENDO ─────────────────────────────────────────────────
 let skeletonRunning = false;
 
 function runSkeletonLocal() {
-  // Se já está rodando, deixa terminar
   if (skeletonRunning) return;
   skeletonRunning = true;
 
   const runner = document.getElementById('skeletonRunner');
   const img    = document.getElementById('skeletonImg');
+  const vw     = window.innerWidth;
+  const sw     = 480;
+  const dur    = 2500;
 
-  const vw       = window.innerWidth;
-  const sw       = 480;
-  const duration = 2500; // ms para atravessar a tela toda
-
-  // Reseta GIF
   img.src = '';
   img.src = './img/skeleton-run.gif?t=' + Date.now();
 
-  // Posição inicial: fora à direita, sem animação
   runner.style.transition = 'none';
   runner.style.transform  = `translateX(${vw + sw}px) translateY(-50%)`;
-
-  // Força o browser a aplicar o estado acima antes de animar
   void runner.getBoundingClientRect();
 
-  // Anima da direita para a esquerda
   requestAnimationFrame(() => {
-    runner.style.transition = `transform ${duration}ms linear`;
-    runner.style.transform  = `translateX(-${sw + 10}px) translateY(-50%)`;
+    runner.style.transition = `transform ${dur}ms linear`;
+    runner.style.transform  = `translateX(-${sw + 20}px) translateY(-50%)`;
   });
 
-  // Após terminar, reseta sem travar para próxima chamada
   setTimeout(() => {
     runner.style.transition = 'none';
     runner.style.transform  = `translateX(${vw + sw}px) translateY(-50%)`;
     img.src = '';
     skeletonRunning = false;
-  }, duration + 200);
+  }, dur + 200);
+}
+
+// ── ESQUELETO DANÇANDO ─────────────────────────────────────────────────
+let danceRunning = false;
+
+function showDanceLocal(data) {
+  if (danceRunning) return;
+  danceRunning = true;
+
+  const el  = document.getElementById('dancingSkeleton');
+  const img = document.getElementById('danceImg');
+
+  // posição aleatória gerada pelo quem disparou (via data) ou localmente
+  const px = (data && data.px != null) ? data.px : Math.random();
+  const py = (data && data.py != null) ? data.py : Math.random();
+
+  const size = 220;
+  const x = Math.floor(px * (window.innerWidth  - size));
+  const y = Math.floor(py * (window.innerHeight - size));
+
+  img.src = '';
+  img.src = './img/gif2.gif?t=' + Date.now();
+  el.style.left    = x + 'px';
+  el.style.top     = y + 'px';
+  el.style.display = 'block';
+
+  setTimeout(() => {
+    el.style.display = 'none';
+    img.src = '';
+    danceRunning = false;
+  }, 4000);
 }
 
 // ── TECLADO ────────────────────────────────────────────────────────────
@@ -796,22 +864,32 @@ let konamiSeq = [];
 const konamiCode = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown'];
 let nCount = 0, nTimer = null;
 let mCount = 0, mTimer = null;
+let bCount = 0, bTimer = null;
 
 window.addEventListener('keydown', (e) => {
-  // N N → esqueleto para todos
+  // N N → esqueleto correndo para todos
   if (e.key === 'n' || e.key === 'N') {
-    nCount++;
-    clearTimeout(nTimer);
+    nCount++; clearTimeout(nTimer);
     if (nCount >= 2) { nCount = 0; broadcastEvent('skeletonRun'); }
     else nTimer = setTimeout(() => { nCount = 0; }, 600);
     return;
   }
   // M M → gnome para todos
   if (e.key === 'm' || e.key === 'M') {
-    mCount++;
-    clearTimeout(mTimer);
+    mCount++; clearTimeout(mTimer);
     if (mCount >= 2) { mCount = 0; broadcastEvent('gnomeSound'); }
     else mTimer = setTimeout(() => { mCount = 0; }, 600);
+    return;
+  }
+  // B B → esqueleto dançando em posição aleatória para todos
+  if (e.key === 'b' || e.key === 'B') {
+    bCount++; clearTimeout(bTimer);
+    if (bCount >= 2) {
+      bCount = 0;
+      // gera posição aleatória UMA vez e manda para todos (mesma posição)
+      broadcastEvent('danceEvent', { px: Math.random(), py: Math.random() });
+    }
+    else bTimer = setTimeout(() => { bCount = 0; }, 600);
     return;
   }
   // ↑↑↓↓ → foxy para todos
@@ -825,10 +903,11 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// ── LISTENERS — registrados ao entrar na sala ──────────────────────────
+// ── LISTENERS ─────────────────────────────────────────────────────────
 function initFoxyListener(code)    { initRoomListener(code, 'foxyScare',   showFoxyLocal);    }
 function initSkeletonListener(code){ initRoomListener(code, 'skeletonRun', runSkeletonLocal); }
 function initGnomeListener(code)   { initRoomListener(code, 'gnomeSound',  playGnomeLocal);   }
+function initDanceListener(code)   { initRoomListener(code, 'danceEvent',  showDanceLocal);   }
 
 async function enterRoom(code) {
   await cleanAllEmptyRooms();
@@ -846,6 +925,8 @@ async function enterRoom(code) {
   initFeed(code); initOnline(code); initCmds(code);
   initFoxyListener(code);
   initSkeletonListener(code);
+  initGnomeListener(code);
+  initDanceListener(code);
   requestAnimationFrame(()=>initBox());
 }
 
