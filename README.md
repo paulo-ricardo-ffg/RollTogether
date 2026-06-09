@@ -216,7 +216,9 @@ Open a Pull Request and describe your changes.
 | Multiplayer          | ✅ Complete     |
 | Firebase Integration | ✅ Complete     |
 | Roll History         | ✅ Complete |
-| Statistics Dashboard | 📅 Planned     |
+| Statistics Dashboard         | 📅 Planned |
+| Security Implementation      | 📅 Planned |
+| File Organization & Structure| 📅 Planned |
 
 ---
 
