@@ -24,6 +24,29 @@ https://paulo-ricardo-ffg.github.io/RollTogether/
 
 
 ---
+# ⚠️ Security Notice
+
+This project was primarily developed as an experimental and educational project focused on rapid prototyping, multiplayer functionality, user experience, and AI-assisted development.
+
+**The current version contains known security weaknesses and should not be considered production-ready.**
+
+Some areas that may require significant security improvements include:
+
+* Firebase security rules
+* Room access validation
+* Input sanitization
+* Client-side trust assumptions
+* Rate limiting and abuse prevention
+* Authentication and authorization controls
+* Data validation and integrity checks
+
+The project is publicly available for learning, experimentation, community feedback, and collaborative improvement.
+
+If you plan to deploy, fork, or use this project in a production environment, a comprehensive security review is strongly recommended before doing so.
+
+Security hardening is planned for future versions of RollTogether.
+
+---
 
 # ✨ Features
 
@@ -208,16 +231,18 @@ Open a Pull Request and describe your changes.
 
 # 📊 Project Status
 
-| Feature              | Status         |
-| -------------------- | -------------- |
-| D4-D20 Dice          | ✅ Complete     |
-| D100 Dice            | ✅ Complete     |
-| 3D Physics           | ✅ Complete     |
-| Multiplayer          | ✅ Complete     |
-| Firebase Integration | ✅ Complete     |
-| Roll History         | ✅ Complete |
-| Security Implementation      | 📅 Planned |
-| File Organization & Structure| 📅 Planned |
+| Feature                       | Status      |
+| ----------------------------- | ----------- |
+| D4-D20 Dice                   | ✅ Complete  |
+| D100 Dice                     | ✅ Complete  |
+| 3D Physics                    | ✅ Complete  |
+| Multiplayer                   | ✅ Complete  |
+| Firebase Integration          | ✅ Complete  |
+| Roll History                  | ✅ Complete  |
+| Security Review               | ⚠️ Required |
+| Security Hardening            | 📅 Planned  |
+| File Organization & Structure | 📅 Planned  |
+
 
 ---
 
