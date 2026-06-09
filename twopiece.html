@@ -46,18 +46,7 @@
   --ease-out: cubic-bezier(0.16,1,0.3,1);
 }
 
-#skeletonRunner {
-  position: fixed;
-  top: 50%;
-  left: 0;
-  width: 480px;
-  height: 480px;
-  transform: translate(-9999px, -50%);
-  pointer-events: none;
-  z-index: 10001;
-  display: none;
-  will-change: transform;
-}
+
 
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 html { scroll-behavior:smooth; }
@@ -123,10 +112,13 @@ body {
 #skeletonRunner {
   position: fixed;
   top: 50%;
-  transform: translateY(-50%);
-  z-index: 10001;
+  left: 0;
+  width: 480px;
+  height: 226px;
   pointer-events: none;
-  display: none;
+  z-index: 99999;
+  will-change: transform;
+  transform: translateX(110vw) translateY(-50%);
 }
 #skeletonRunner img {
   width: 480px;
@@ -713,152 +705,130 @@ async function cleanAllEmptyRooms() {
 }
 async function cleanupRoom(roomCode) { if (!roomCode) return; try { const onlineRef = ref(db, `rooms/${roomCode}/online`); const snap = await get(onlineRef); if (!snap.exists()) { await remove(ref(db, `rooms/${roomCode}`)); } } catch (err) { console.warn(err); } }
 
-// ── GIF1 FULLSCREEN: roda UMA VEZ ─────────────────────────────────────
-function showFoxyForEveryone() {
+// ══════════════════════════════════════════════════════════════════════
+// EVENTOS DE SALA — tudo passa pelo Firebase, inclusive quem dispara
+// ══════════════════════════════════════════════════════════════════════
+
+// Dispara um evento para TODOS (incluindo si mesmo) via Firebase
+function broadcastEvent(eventName) {
+  if (!room || !uid) return;
+  push(ref(db, `rooms/${room}/${eventName}`), {
+    uid, player, clientTs: Date.now(), timestamp: serverTimestamp()
+  }).catch(err => console.warn(`Erro broadcast ${eventName}:`, err));
+}
+
+// Registra listener que executa localFn para TODOS (incluindo quem enviou)
+function initRoomListener(code, eventName, localFn) {
+  const listenSince = Date.now();
+  onChildAdded(ref(db, `rooms/${code}/${eventName}`), (snap) => {
+    const data = snap.val();
+    if (!data) return;
+    // ignora eventos antigos de antes de entrar na sala
+    if ((data.clientTs || 0) < listenSince - 3000) return;
+    localFn();
+    setTimeout(() => remove(ref(db, `rooms/${code}/${eventName}/${snap.key}`)).catch(()=>{}), 2000);
+  });
+}
+
+// ── GIF1 FULLSCREEN ────────────────────────────────────────────────────
+function showFoxyLocal() {
   const overlay = document.getElementById('foxyOverlay');
   const img     = document.getElementById('foxyImg');
   if (!overlay || !img) return;
   img.src = './img/gif1.gif?t=' + Date.now();
   overlay.classList.add('show');
-  if (window.foxyTimeout) clearTimeout(window.foxyTimeout);
+  clearTimeout(window.foxyTimeout);
   window.foxyTimeout = setTimeout(() => {
     overlay.classList.remove('show');
     img.src = '';
   }, 800);
 }
 
-// ── ESQUELETO: só anima localmente (sem push Firebase) ─────────────────
+// ── GNOME AUDIO ────────────────────────────────────────────────────────
+function playGnomeLocal() {
+  const a = new Audio('./img/gnome.mp3');
+  a.play().catch(() => {});
+}
+
+// ── ESQUELETO ──────────────────────────────────────────────────────────
 let skeletonRunning = false;
 
 function runSkeletonLocal() {
+  // Se já está rodando, deixa terminar
   if (skeletonRunning) return;
   skeletonRunning = true;
 
-  const runner = document.getElementById("skeletonRunner");
-  const img = document.getElementById("skeletonImg");
+  const runner = document.getElementById('skeletonRunner');
+  const img    = document.getElementById('skeletonImg');
 
-  // Reinicia o GIF
-  img.src = "";
-  img.src = "./img/skeleton-run.gif?t=" + Date.now();
+  const vw       = window.innerWidth;
+  const sw       = 480;
+  const duration = 2500; // ms para atravessar a tela toda
 
-  const skeletonWidth = 480;
-  const startX = window.innerWidth + skeletonWidth;
-  const endX = -skeletonWidth;
+  // Reseta GIF
+  img.src = '';
+  img.src = './img/skeleton-run.gif?t=' + Date.now();
 
-  // Reseta completamente a posição
-  runner.style.display = "none";
-  runner.style.left = "0px";
-  runner.style.transform = `translate(${startX}px, -50%)`;
+  // Posição inicial: fora à direita, sem animação
+  runner.style.transition = 'none';
+  runner.style.transform  = `translateX(${vw + sw}px) translateY(-50%)`;
 
+  // Força o browser a aplicar o estado acima antes de animar
+  void runner.getBoundingClientRect();
+
+  // Anima da direita para a esquerda
   requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      runner.style.display = "block";
-
-      const duration = 600;
-      const startTime = performance.now();
-
-      function animate(now) {
-        const progress = Math.min(
-          (now - startTime) / duration,
-          1
-        );
-
-        const x =
-          startX + (endX - startX) * progress;
-
-        runner.style.transform =
-          `translate(${x}px, -50%)`;
-
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        } else {
-          runner.style.display = "none";
-          runner.style.transform = `translate(${startX}px, -50%)`;
-          img.src = "";
-          skeletonRunning = false;
-        }
-      }
-
-      requestAnimationFrame(animate);
-    });
+    runner.style.transition = `transform ${duration}ms linear`;
+    runner.style.transform  = `translateX(-${sw + 10}px) translateY(-50%)`;
   });
-}
 
-// Anima localmente + avisa o Firebase para todos na sala
-function runSkeleton() {
-  runSkeletonLocal();
-  if (room && uid) {
-    push(ref(db, `rooms/${room}/skeletonRun`), {
-      uid, player, clientTs: Date.now(), timestamp: serverTimestamp()
-    }).catch(err => console.warn('Erro enviando skeleton:', err));
-  }
-}
-
-// ── LISTENER FIREBASE: esqueleto disparado por outro jogador ────────────
-function initSkeletonListener(code) {
-  const skelRef = ref(db, `rooms/${code}/skeletonRun`);
-  const listenSince = Date.now();
-  onChildAdded(skelRef, (snap) => {
-    const data = snap.val();
-    if (!data || data.uid === uid) return;
-    // Ignora eventos velhos que já estavam no nó antes de entrar na sala
-    if ((data.clientTs || 0) < listenSince - 3000) return;
+  // Após terminar, reseta sem travar para próxima chamada
+  setTimeout(() => {
+    runner.style.transition = 'none';
+    runner.style.transform  = `translateX(${vw + sw}px) translateY(-50%)`;
+    img.src = '';
     skeletonRunning = false;
-    runSkeletonLocal();
-    setTimeout(() => remove(ref(db, `rooms/${code}/skeletonRun/${snap.key}`)).catch(()=>{}), 1000);
-  });
+  }, duration + 200);
 }
-// ── TECLADO: ↑↑↓↓ = gif1 fullscreen | N N = esqueleto ─────────────────
-let konamiSequence  = [];
-const konamiCode    = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown'];
-let nKeyCount = 0;
-let nKeyTimer = null;
+
+// ── TECLADO ────────────────────────────────────────────────────────────
+let konamiSeq = [];
+const konamiCode = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown'];
+let nCount = 0, nTimer = null;
+let mCount = 0, mTimer = null;
 
 window.addEventListener('keydown', (e) => {
-  // Tecla 'N' ou 'n' duas vezes em menos de 600 ms = esqueleto
+  // N N → esqueleto para todos
   if (e.key === 'n' || e.key === 'N') {
-    e.preventDefault(); // Evita digitar 'n' em inputs acidentalmente
-    nKeyCount++;
-    clearTimeout(nKeyTimer);
-    if (nKeyCount >= 2) {
-      nKeyCount = 0;
-      runSkeleton();
-    } else {
-      nKeyTimer = setTimeout(() => { nKeyCount = 0; }, 600);
-    }
+    nCount++;
+    clearTimeout(nTimer);
+    if (nCount >= 2) { nCount = 0; broadcastEvent('skeletonRun'); }
+    else nTimer = setTimeout(() => { nCount = 0; }, 600);
     return;
   }
-
-  // ↑↑↓↓ = gif1 fullscreen
-  if (!['ArrowUp','ArrowDown','ArrowLeft'].includes(e.key)) return;
-  konamiSequence.push(e.key);
-  if (konamiSequence.length > konamiCode.length) konamiSequence.shift();
-
-  const match = konamiSequence.length === konamiCode.length &&
-                konamiSequence.every((val, idx) => val === konamiCode[idx]);
-
-  if (match) {
-    showFoxyForEveryone();
-    konamiSequence = [];
-    if (room && uid) {
-      push(ref(db, `rooms/${room}/foxyScare`), {
-        uid, player, timestamp: serverTimestamp()
-      }).catch(err => console.warn('Erro enviando scare:', err));
-    }
+  // M M → gnome para todos
+  if (e.key === 'm' || e.key === 'M') {
+    mCount++;
+    clearTimeout(mTimer);
+    if (mCount >= 2) { mCount = 0; broadcastEvent('gnomeSound'); }
+    else mTimer = setTimeout(() => { mCount = 0; }, 600);
+    return;
+  }
+  // ↑↑↓↓ → foxy para todos
+  if (!['ArrowUp','ArrowDown'].includes(e.key)) return;
+  konamiSeq.push(e.key);
+  if (konamiSeq.length > konamiCode.length) konamiSeq.shift();
+  if (konamiSeq.length === konamiCode.length &&
+      konamiSeq.every((v,i) => v === konamiCode[i])) {
+    konamiSeq = [];
+    broadcastEvent('foxyScare');
   }
 });
 
-// ── LISTENER FIREBASE: gif1 disparado por outro jogador ───────────────
-function initFoxyListener(code) {
-  const foxyRef = ref(db, `rooms/${code}/foxyScare`);
-  onChildAdded(foxyRef, (snap) => {
-    const data = snap.val();
-    if (data && data.uid !== uid) {
-      showFoxyForEveryone();
-      setTimeout(() => remove(ref(db, `rooms/${code}/foxyScare/${snap.key}`)).catch(()=>{}), 1000);
-    }
-  });
-}
+// ── LISTENERS — registrados ao entrar na sala ──────────────────────────
+function initFoxyListener(code)    { initRoomListener(code, 'foxyScare',   showFoxyLocal);    }
+function initSkeletonListener(code){ initRoomListener(code, 'skeletonRun', runSkeletonLocal); }
+function initGnomeListener(code)   { initRoomListener(code, 'gnomeSound',  playGnomeLocal);   }
 
 async function enterRoom(code) {
   await cleanAllEmptyRooms();
