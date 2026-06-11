@@ -46,8 +46,6 @@
   --ease-out: cubic-bezier(0.16,1,0.3,1);
 }
 
-
-
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 html { scroll-behavior:smooth; }
 
@@ -748,11 +746,63 @@ function initRoomListener(code, eventName, localFn) {
   });
 }
 
-// ── GIF1 FULLSCREEN ────────────────────────────────────────────────────
+// ── AUDIO ENGINE ───────────────────────────────────────────────────────
+// Carrega gnome.mp3 e fnaf.mp3 juntos no mesmo AudioContext
+let _gnomeBuf = null;
+let _fnafBuf  = null;
+let _actx     = null;
+
+function _initAudio() {
+  if (_actx) return;
+  try {
+    _actx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // gnome
+    fetch('./img/gnome.mp3')
+      .then(r => r.arrayBuffer())
+      .then(buf => _actx.decodeAudioData(buf))
+      .then(decoded => { _gnomeBuf = decoded; })
+      .catch(() => {});
+
+    // fnaf — ligado ao gif do foxy
+    fetch('./img/fnaf.mp3')
+      .then(r => r.arrayBuffer())
+      .then(buf => _actx.decodeAudioData(buf))
+      .then(decoded => { _fnafBuf = decoded; })
+      .catch(() => {});
+
+  } catch(e) {}
+}
+
+['click','keydown','touchstart'].forEach(ev =>
+  document.addEventListener(ev, _initAudio, { once: true, passive: true })
+);
+
+// helper genérico para tocar um AudioBuffer
+function _playBuf(buf, fallbackSrc) {
+  if (_actx && buf) {
+    try {
+      if (_actx.state === 'suspended') _actx.resume();
+      const src = _actx.createBufferSource();
+      src.buffer = buf;
+      src.connect(_actx.destination);
+      src.start(0);
+      return;
+    } catch(e) {}
+  }
+  // fallback caso o AudioContext ainda não esteja pronto
+  new Audio(fallbackSrc).play().catch(() => {});
+}
+
+// ── GIF1 FULLSCREEN + AUDIO FNAF ──────────────────────────────────────
 function showFoxyLocal() {
   const overlay = document.getElementById('foxyOverlay');
   const img     = document.getElementById('foxyImg');
   if (!overlay || !img) return;
+
+  // toca o áudio do FNAF junto com o gif
+  _playBuf(_fnafBuf, './img/fnaf.mp3');
+
   img.src = './img/gif1.gif?t=' + Date.now();
   overlay.classList.add('show');
   clearTimeout(window.foxyTimeout);
@@ -763,36 +813,8 @@ function showFoxyLocal() {
 }
 
 // ── GNOME AUDIO ────────────────────────────────────────────────────────
-let _gnomeBuf = null;
-let _actx = null;
-
-function _initAudio() {
-  if (_actx) return;
-  try {
-    _actx = new (window.AudioContext || window.webkitAudioContext)();
-    fetch('./img/gnome.mp3')
-      .then(r => r.arrayBuffer())
-      .then(buf => _actx.decodeAudioData(buf))
-      .then(decoded => { _gnomeBuf = decoded; })
-      .catch(() => {});
-  } catch(e) {}
-}
-['click','keydown','touchstart'].forEach(ev =>
-  document.addEventListener(ev, _initAudio, { once: true, passive: true })
-);
-
 function playGnomeLocal() {
-  if (_actx && _gnomeBuf) {
-    try {
-      if (_actx.state === 'suspended') _actx.resume();
-      const src = _actx.createBufferSource();
-      src.buffer = _gnomeBuf;
-      src.connect(_actx.destination);
-      src.start(0);
-      return;
-    } catch(e) {}
-  }
-  new Audio('./img/gnome.mp3').play().catch(() => {});
+  _playBuf(_gnomeBuf, './img/gnome.mp3');
 }
 
 // ── ESQUELETO CORRENDO ─────────────────────────────────────────────────
@@ -838,7 +860,6 @@ function showDanceLocal(data) {
   const el  = document.getElementById('dancingSkeleton');
   const img = document.getElementById('danceImg');
 
-  // posição aleatória gerada pelo quem disparou (via data) ou localmente
   const px = (data && data.px != null) ? data.px : Math.random();
   const py = (data && data.py != null) ? data.py : Math.random();
 
@@ -886,13 +907,12 @@ window.addEventListener('keydown', (e) => {
     bCount++; clearTimeout(bTimer);
     if (bCount >= 2) {
       bCount = 0;
-      // gera posição aleatória UMA vez e manda para todos (mesma posição)
       broadcastEvent('danceEvent', { px: Math.random(), py: Math.random() });
     }
     else bTimer = setTimeout(() => { bCount = 0; }, 600);
     return;
   }
-  // ↑↑↓↓ → foxy para todos
+  // ↑↑↓↓ → foxy + fnaf para todos
   if (!['ArrowUp','ArrowDown'].includes(e.key)) return;
   konamiSeq.push(e.key);
   if (konamiSeq.length > konamiCode.length) konamiSeq.shift();
