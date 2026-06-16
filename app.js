@@ -491,23 +491,27 @@ function generateResults(sel) {
   return results;
 }
 
+// ─── FIX: d100 gera 2 segmentos individuais de 1d10 (dezena + unidade) ────────
 function buildSyncNotation(results) {
-  const expanded = [];
+  const segments = [];
+  const regularGroups = new Map();
+
   for (const r of results) {
     if (r.dieId === "d100") {
-      expanded.push({ sides: 10, val: r.tensVisual });
-      expanded.push({ sides: 10, val: r.unitsVisual });
+      // Cada d100 vira dois segmentos separados de 1d10: dezena e unidade
+      segments.push(`1d10@${r.tensVisual}`);
+      segments.push(`1d10@${r.unitsVisual}`);
     } else {
-      expanded.push({ sides: r.sides, val: r.val });
+      if (!regularGroups.has(r.sides)) regularGroups.set(r.sides, []);
+      regularGroups.get(r.sides).push(r.val);
     }
   }
-  const groups = new Map();
-  for (const item of expanded) {
-    if (!groups.has(item.sides)) groups.set(item.sides, []);
-    groups.get(item.sides).push(item.val);
+
+  // Agrupa os dados regulares (não-d100) normalmente
+  for (const [sides, vals] of regularGroups.entries()) {
+    segments.push(`${vals.length}d${sides}@${vals.join(",")}`);
   }
-  const segments = [];
-  for (const [sides, vals] of groups.entries()) segments.push(`${vals.length}d${sides}@${vals.join(",")}`);
+
   return segments;
 }
 
