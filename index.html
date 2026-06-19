@@ -167,6 +167,34 @@
       </div>
     </div>
 
+    <!-- ── Chat flutuante retrátil ── -->
+    <div id="chat-widget" class="chat-widget" aria-label="Chat da sala">
+      <button class="chat-toggle-btn" id="chat-toggle-btn" aria-label="Abrir chat" aria-expanded="false">
+        💬 <span class="chat-toggle-label">Chat</span>
+        <span class="chat-unread-badge" id="chat-unread-badge" aria-label="Mensagens não lidas"></span>
+      </button>
+      <div class="chat-box" id="chat-box" hidden>
+        <div class="chat-box-header">
+          <span>💬 Bate-papo</span>
+          <button class="chat-box-close" id="chat-box-close" aria-label="Fechar chat">✕</button>
+        </div>
+        <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Mensagens do chat">
+          <div class="chat-empty">✨ Nenhuma mensagem ainda. Inicie a conversa!</div>
+        </div>
+        <div class="chat-input-area">
+          <input
+            class="chat-input"
+            id="chat-input"
+            placeholder="Escreva algo…"
+            maxlength="200"
+            autocomplete="off"
+            aria-label="Mensagem do chat"
+          >
+          <button class="chat-send-btn" id="chat-send-btn" aria-label="Enviar">➤</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── Modal de temas ── -->
