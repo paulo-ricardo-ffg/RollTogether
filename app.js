@@ -26,7 +26,7 @@ const db  = getDatabase(app);
 let player = "", room = "";
 let currentPlayerIcon = "🎲";
 const uid = crypto.randomUUID?.() || Math.random().toString(36).slice(2);
-let feedUnsub = null, onlineUnsub = null, rollCommandsUnsub = null;
+let feedUnsub = null, onlineUnsub = null, rollCommandsUnsub = null, chatUnsub = null;
 let allRolls = [], activeFilter = "all", modifier = 0;
 let lastRollId = null;
 
@@ -376,6 +376,7 @@ async function enterRoom(code) {
   if (feedUnsub) feedUnsub();
   if (onlineUnsub) onlineUnsub();
   if (rollCommandsUnsub) rollCommandsUnsub();
+  if (chatUnsub) chatUnsub();
   await destroyDiceBox();
   room = code;
   const chosenIcon = await getAvailableIcon(room, uid);
@@ -387,7 +388,7 @@ async function enterRoom(code) {
   $("display-room-code").textContent = code;
   clearAll(); allRolls = []; activeFilter = "all";
   screen("screen-room");
-  initFeed(code); initOnline(code); initRollCommands(code);
+  initFeed(code); initOnline(code); initRollCommands(code); initChat(code);
   requestAnimationFrame(async () => { await initDiceBox(); });
 }
 
@@ -415,6 +416,8 @@ async function leaveRoom() {
   if (feedUnsub) feedUnsub();
   if (onlineUnsub) onlineUnsub();
   if (rollCommandsUnsub) rollCommandsUnsub();
+  if (window.__chatUnsub) { window.__chatUnsub(); window.__chatUnsub = null; }
+  closeChat(); setChatVisible(false);
   await destroyDiceBox();
   await cleanupRoom(oldRoom);
   room = "";
@@ -620,3 +623,117 @@ renderDice(); updateFormula(); updateModDisplay();
 screen("screen-name");
 cleanAllEmptyRooms();
 setInterval(() => cleanAllEmptyRooms(), 10 * 60 * 1000);
+
+// ─── Chat ─────────────────────────────────────────────────────────────────────
+let chatUnsub_listener = null;  // listener Firebase (diferente da var chatUnsub já declarada)
+let chatOpen = false;
+let chatUnreadCount = 0;
+let chatIsVisible = false; // widget visível só na sala
+
+function formatChatTime(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function renderChatMessage(data, isMine) {
+  const div = document.createElement("div");
+  div.className = `chat-msg${isMine ? " chat-msg-mine" : ""}`;
+  const headerEl = document.createElement("div");
+  headerEl.className = "chat-msg-header";
+  headerEl.innerHTML = `<span>${esc(data.icon || "🎲")}</span><span>${esc(data.name || "Anônimo")}</span><span class="chat-msg-time">${formatChatTime(data.ts)}</span>`;
+  const bubble = document.createElement("div");
+  bubble.className = "chat-bubble";
+  bubble.textContent = data.text;
+  div.appendChild(headerEl);
+  div.appendChild(bubble);
+  return div;
+}
+
+function setChatVisible(visible) {
+  chatIsVisible = visible;
+  const widget = document.getElementById("chat-widget");
+  if (!widget) return;
+  if (visible) widget.classList.add("visible");
+  else widget.classList.remove("visible");
+}
+
+function openChat() {
+  chatOpen = true;
+  const box = document.getElementById("chat-box");
+  const btn = document.getElementById("chat-toggle-btn");
+  if (box) box.hidden = false;
+  if (btn) btn.setAttribute("aria-expanded", "true");
+  // Clear unread
+  chatUnreadCount = 0;
+  const badge = document.getElementById("chat-unread-badge");
+  if (badge) { badge.textContent = ""; badge.classList.remove("show"); }
+  // Scroll to bottom
+  const msgs = document.getElementById("chat-messages");
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+}
+
+function closeChat() {
+  chatOpen = false;
+  const box = document.getElementById("chat-box");
+  const btn = document.getElementById("chat-toggle-btn");
+  if (box) box.hidden = true;
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function initChat(roomCode) {
+  const container = document.getElementById("chat-messages");
+  if (!container) return;
+  container.innerHTML = '<div class="chat-empty">✨ Nenhuma mensagem ainda. Inicie a conversa!</div>';
+
+  // Unsub previous if any
+  if (chatUnsub) { chatUnsub(); }
+
+  const chatRef = query(ref(db, `rooms/${roomCode}/chat`), limitToLast(80));
+  const loadedKeys = new Set();
+
+  const unsub = onChildAdded(chatRef, snap => {
+    if (loadedKeys.has(snap.key)) return;
+    loadedKeys.add(snap.key);
+    const data = snap.val();
+    const isMine = data.uid === uid;
+    const empty = container.querySelector(".chat-empty");
+    if (empty) empty.remove();
+    container.appendChild(renderChatMessage(data, isMine));
+    container.scrollTop = container.scrollHeight;
+    // Badge if chat is closed and message is from others
+    if (!chatOpen && !isMine) {
+      chatUnreadCount++;
+      const badge = document.getElementById("chat-unread-badge");
+      if (badge) { badge.textContent = chatUnreadCount > 9 ? "9+" : chatUnreadCount; badge.classList.add("show"); }
+    }
+  });
+  // Store in chatUnsub (already declared globally)
+  // We reassign the global
+  window.__chatUnsub = unsub;
+
+  setChatVisible(true);
+}
+
+async function sendChatMessage() {
+  if (!room) return;
+  const input = document.getElementById("chat-input");
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  input.focus();
+  await push(ref(db, `rooms/${room}/chat`), {
+    uid, name: player, icon: currentPlayerIcon, text, ts: serverTimestamp()
+  });
+}
+
+// Wire up chat UI
+document.getElementById("chat-toggle-btn")?.addEventListener("click", () => {
+  if (chatOpen) closeChat(); else openChat();
+});
+document.getElementById("chat-box-close")?.addEventListener("click", closeChat);
+document.getElementById("chat-send-btn")?.addEventListener("click", sendChatMessage);
+document.getElementById("chat-input")?.addEventListener("keypress", e => {
+  if (e.key === "Enter") sendChatMessage();
+});
